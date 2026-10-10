@@ -1008,10 +1008,14 @@ logger.info(
     f"[MultiGPU] Registration complete. Final mappings: {', '.join(NODE_CLASS_MAPPINGS.keys())}"
 )
 
+from .clip_dynamic_load_list_guard import register_clip_dynamic_load_list_guard
 from .clip_runtime_device_guard import (
     install_clip_runtime_device_guard,
     install_vae_runtime_device_guard,
 )
+
+# Install before any workflow executes, including DisTorch2 and core-only CLIP loaders.
+register_clip_dynamic_load_list_guard()
 
 install_clip_runtime_device_guard(multigpu_runtime_device_guard)
 

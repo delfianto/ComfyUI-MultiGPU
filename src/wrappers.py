@@ -688,7 +688,6 @@ def override_class_offload(cls):
 def override_class_clip(cls):
     """Standard MultiGPU device override for CLIP models (with device kwarg workaround)"""
     from . import get_current_text_encoder_device, set_current_text_encoder_device
-    from .clip_dynamic_load_list_guard import register_clip_dynamic_load_list_guard
 
     class NodeOverride(cls):
         @classmethod
@@ -707,7 +706,6 @@ def override_class_clip(cls):
             original_text_device = get_current_text_encoder_device()
             if device is not None:
                 set_current_text_encoder_device(device)
-            register_clip_dynamic_load_list_guard()
             kwargs["device"] = "default"
             fn = getattr(super(), cls.FUNCTION)
             out = fn(*args, **kwargs)
@@ -722,7 +720,6 @@ def override_class_clip(cls):
 def override_class_clip_no_device(cls):
     """Standard MultiGPU device override for Triple/Quad CLIP models (no device kwarg workaround)"""
     from . import get_current_text_encoder_device, set_current_text_encoder_device
-    from .clip_dynamic_load_list_guard import register_clip_dynamic_load_list_guard
 
     class NodeOverride(cls):
         @classmethod
@@ -741,7 +738,6 @@ def override_class_clip_no_device(cls):
             original_text_device = get_current_text_encoder_device()
             if device is not None:
                 set_current_text_encoder_device(device)
-            register_clip_dynamic_load_list_guard()
             fn = getattr(super(), cls.FUNCTION)
             out = fn(*args, **kwargs)
             try:

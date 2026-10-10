@@ -77,6 +77,7 @@ then incorrect GPU allocation, then optional-provider compatibility.
 | Critical | #187, #210, #218, #220; PR #216 | Prefer Torch's peer API; resolve versioned/Linux and Windows runtimes; all probe failures return false. CPU regressions cover success, failures, caching and platform candidates. Windows runtime execution still needs a Windows rig. |
 | Critical | #211, #213, #222 | Keep comfy-kitchen >=0.2.35 native DLPack exports. Moving tensors inside a per-argument export wrapper can conflict with the kernel's actual device/stream. Older kitchen versions retain the guarded compatibility path and are not validated here. |
 | Critical | Local FP8 CLIP crash; #189/#185 related symptoms | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device, restoring device state on exceptions. CLIP nesting and VAE regressions plus local dual-GPU generation. Similar symptoms alone do not establish that every upstream reproduction is fixed. |
+| Critical, partly addressed | #184; PR #183 | Install the dynamic loading traversal guard at node startup, covering DisTorch2 and core-only loaders before any standard MultiGPU CLIP node runs. Match core parent-module classification and deduplicate shared modules in the parameter walker. Deep-graph CPU regressions and a local empty-allocation DisTorch2 generation pass; the Windows native crash still needs its original reproduction. |
 | High | #202/#186; PR #195 | Initialize visible aimdo devices together before core startup. Preserve the primary GPU's headroom; never reinitialize live contexts or report missing devices as initialized. Defer Torch import until core calls init_device. Existing per-device legacy fallback remains. |
 | High | #191 | DisTorch2 uses legacy ModelPatcher while loading an explicitly distributed model; DynamicVRAM otherwise bypasses donor placement in the patched legacy loading path. Ordinary loaders keep DynamicVRAM. Preserve patcher alias and loader device state on errors. |
 | High | #196; PR #198 | Count unique underlying model parameters by physical nbytes without evaluating parametrized weight properties. Tests cover weight_norm, tied parameters, and packed storage. Buffers and allocator overhead are not included in the parameter estimate. |
@@ -130,13 +131,13 @@ need the original reproduction before we can claim these issues are resolved.
   [WanAnimate cache validation](#wananimate-cache-validation-2026-10-10).
   The original Windows/older-kitchen native crash remains unverified; capture
   native crash diagnostics in an isolated test process if it reproduces.
-- [ ] **Critical: Windows DynamicVRAM stack overflow —
+- [ ] **Critical, partly addressed: Windows DynamicVRAM stack overflow —
   [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184).** Reports
-  include failures even without MultiGPU nodes in the graph. A nonrecursive
-  dynamic loading guard already exists; audit its coverage across standard and
-  DisTorch loaders and test traversal behavior on Linux. Confirming the native
-  failure and its resolution requires the Windows reproduction. Do not assume
-  the existing guard resolves every reported configuration.
+  include failures even without MultiGPU nodes in the graph. Fixed the guard's
+  registration gap and fallback parent classification; Linux CPU and live
+  DisTorch2 tests pass. See [Dynamic loading validation](#dynamic-loading-validation-2026-10-10).
+  Confirming the native failure and its resolution requires the Windows
+  reproduction. Do not assume this resolves every reported configuration.
 - [ ] **High, partly addressed: mixed INT8/INT4 donor allocation —
   [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209).** MiniMax H3
   reportedly accepts the allocation string while donor VRAM remains nearly
@@ -281,3 +282,42 @@ summary are saved under
 `/srv/appdata/comfyui/user/default/workflow-backups/wananimate-issue219/`.
 Animated outputs are under
 `/home/geist/Pictures/StableDiffusion/wananimate-issue219/`.
+
+## Dynamic loading validation (2026-10-10)
+
+Upstream PR #183 installed the nonrecursive `_load_list` guard only inside the
+standard MultiGPU CLIP wrappers. DisTorch2 with an empty allocation string keeps
+DynamicVRAM enabled and could reach the unguarded loader when those wrappers
+had never run. The fork now installs the guard once during custom-node startup;
+per-node installation is removed. Older ComfyUI builds without
+`ModelPatcherDynamic` skip registration, and ordinary small graphs and
+non-dynamic calls still delegate to core.
+
+The fallback now checks descendant parameters even when a parent has no direct
+parameters, matching ComfyUI 0.39.0. This prevents a cast-enabled parent from
+being mistaken for a leaf and passing its entire subtree into recursive
+`state_dict()` sizing. The parameter iterator also visits each shared module
+once, preserving Torch's first-path and tied-parameter behavior and terminating
+on a module back reference. This does not promise support for cyclic models
+through all of ComfyUI's other operations.
+
+Seven added CPU tests cover a chain deeper than Python's recursion limit,
+parent classification and dtype movement, shared/tied parameters, walker back
+references, idempotence, native delegation, and older-core compatibility.
+All 29 tests pass in both the Python 3.12 CPU environment and the production
+container. Ruff and basedpyright pass without warnings. A representative model's
+fallback load list matches the installed core's dynamic load list.
+
+After restarting the idle service, all registered node IDs and input schemas
+remain unchanged. A fresh Wan Animate INT8 ConvRot test used
+`CLIPLoaderDisTorch2MultiGPU` with no donor allocation, UMT5 and VAE on the 3060,
+and generation on the 4080: 192×320, 17 frames, 2 steps, GPU/int8 cache. It
+completed successfully, and the saved animation contains 17 nonblank frames.
+Startup and generation logs confirm the guard was installed before any loader
+ran and was used for the empty-allocation text encoder. Models were unloaded
+afterward and the service remained healthy with an empty queue.
+
+These results validate the registration gap and fallback behavior on Linux.
+They do not reproduce or establish resolution of #184's Windows native C-stack
+failure, nor validate its ZImage checkpoint or every ComfyUI version. Keep the
+TODO open until the original Windows case is tested.

@@ -33,8 +33,12 @@ def _iter_named_modules_nonrecursive(module):
 def _iter_named_parameters_nonrecursive(module):
     stack = [("", module)]
     seen = set()
+    seen_modules = set()
     while stack:
         prefix, current = stack.pop()
+        if id(current) in seen_modules:
+            continue
+        seen_modules.add(id(current))
         for name, param in current._parameters.items():
             if param is None:
                 continue
@@ -80,11 +84,10 @@ def _safe_dynamic_load_list(self, default_device=None):
     for n, m in _iter_named_modules_nonrecursive(self.model):
         default = False
         params = dict(m.named_parameters(recurse=False))
-        if params:
-            for name, _ in _iter_named_parameters_nonrecursive(m):
-                if name not in params:
-                    default = True
-                    break
+        for name, _ in _iter_named_parameters_nonrecursive(m):
+            if name not in params:
+                default = True
+                break
 
         if default and default_device is not None:
             for param_name, param in params.items():
@@ -119,7 +122,10 @@ def _safe_dynamic_load_list(self, default_device=None):
 
 
 def register_clip_dynamic_load_list_guard():
-    original = comfy.model_patcher.ModelPatcherDynamic._load_list
+    patcher = getattr(comfy.model_patcher, "ModelPatcherDynamic", None)
+    if patcher is None:
+        return False
+    original = patcher._load_list
     if getattr(original, _PATCH_MARKER, False):
         return False
 
@@ -128,14 +134,12 @@ def register_clip_dynamic_load_list_guard():
             return original(self, for_dynamic=for_dynamic, default_device=default_device)
 
         if _graph_requires_guard(self.model):
-            logger.info(
-                "[MultiGPU Issue21] Using non-recursive ModelPatcherDynamic._load_list guard"
-            )
+            logger.info("[MultiGPU] Using non-recursive ModelPatcherDynamic._load_list guard")
             return _safe_dynamic_load_list(self, default_device=default_device)
 
         return original(self, for_dynamic=for_dynamic, default_device=default_device)
 
     setattr(guarded_load_list, _PATCH_MARKER, True)
-    comfy.model_patcher.ModelPatcherDynamic._load_list = guarded_load_list
-    logger.info("[MultiGPU Issue21] Registered ModelPatcherDynamic._load_list guard")
+    patcher._load_list = guarded_load_list
+    logger.info("[MultiGPU] Registered ModelPatcherDynamic._load_list guard")
     return True
