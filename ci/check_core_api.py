@@ -23,7 +23,10 @@ def main():
     import comfy.model_patcher as mp
     import comfy.sd
     import folder_paths
+    import server
     import torch
+    from app.assets.manager import NoAssets
+    from comfy.cli_args import args as core_args
     from comfy.supported_models_base import BASE
 
     import nodes
@@ -46,7 +49,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mgpu-api-") as directory:
         Path(directory, "ComfyUI-MultiGPU").symlink_to(Path(__file__).resolve().parents[1])
         folder_paths.add_model_folder_path("custom_nodes", directory)
-        asyncio.run(nodes.init_extra_nodes(init_api_nodes=False))
+
+        async def initialize():
+            server.PromptServer(asyncio.get_running_loop(), NoAssets(core_args))
+            await nodes.init_extra_nodes(init_api_nodes=False)
+
+        asyncio.run(initialize())
     missing = required - nodes.NODE_CLASS_MAPPINGS.keys()
     if missing:
         raise AssertionError(f"Missing MultiGPU loaders: {sorted(missing)}")
