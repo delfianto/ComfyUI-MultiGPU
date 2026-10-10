@@ -1,78 +1,53 @@
-# ComfyUI-MultiGPU — personal maintained fork
+# ComfyUI-MultiGPU
 
-This is my **PERSONAL FORK** of
+This is my **personal fork** of the archived
 [pollockjj/ComfyUI-MultiGPU](https://github.com/pollockjj/ComfyUI-MultiGPU),
-maintained for my own ComfyUI setup. Upstream is archived. I am keeping this copy
-working on my machine and fixing the problems I actually run into.
+maintained for my own ComfyUI setup.
 
 **DISCLAIMER: I am NOT BY ANY MEANS a Python guru or GPU kernel hacker. Most fixes
-here were made with an LLM assistant (GPT-6.1 Sol). This works on my machine.
-That does not mean it will work on yours.**
+were made with an LLM assistant (GPT-6.1 Sol). This works on my machine; support
+for other setups or checkpoints is outside scope.**
 
 ## What this does
 
-ComfyUI-MultiGPU adds device selection to model loaders so you can put the
-diffusion model, CLIP/text encoder, and VAE on different GPUs. DisTorch2 also lets
-you move portions of model storage to another GPU or system RAM to free VRAM on
-the compute GPU. It helps with memory capacity; workflow steps still run in
-sequence.
+Adds device selection to ComfyUI loaders so diffusion, CLIP/text encoders, and
+VAEs can run on different GPUs. DisTorch2 can store parts of a model on another
+GPU or in system RAM to free VRAM on the compute GPU. Workflow steps still run
+in sequence.
 
-My setup uses an **RTX 4080 16 GB** for diffusion and an **RTX 3060 12 GB** for
-CLIP/VAE, with the 3060 also acting as a DisTorch2 donor when needed. So far, I
-have tested Krea2 RAW FP8 with a character LoRA and DyPE, FLUX.1-dev FP8 with
-DisTorch2 and DyPE, and native Wan Animate 2 with CPU/default and GPU/int8 cache.
-Details, model filenames, software versions, and test limits are in
-[docs/MAINTENANCE.md](docs/MAINTENANCE.md).
+## Use and support
 
-The local fixes cover encoder execution devices, CUDA/P2P probing, modern
-comfy-kitchen compatibility, DynamicVRAM initialization, DisTorch2 allocation
-and memory accounting, and some loader compatibility issues. Ruff, basedpyright,
-and regression tests keep the changes reviewable. This is ongoing personal
-maintenance, with no release schedule or promise to fix every upstream bug.
+I run ComfyUI on CachyOS Linux with rootless Docker: an **RTX 4080 16 GB** for
+diffusion and an **RTX 3060 12 GB** for CLIP/VAE and donor storage.
 
-## Personal use and support
-
-**THIS IS A PERSONAL FORK. If it does not work with your workflow, hardware, or
-whatever esoteric checkpoint you use, please do not complain or expect me to
-provide support. Use it at your own risk.**
-
-You are welcome to read the code, try it, and fork it. I am sharing what works
-here, with no commitment to debug someone else's setup or add support for every
-model and custom node. The tested configurations are the scope of my claims.
+Tested configurations include Krea2 RAW FP8 with LoRA and DyPE, FLUX.1-dev FP8
+with DisTorch2 and DyPE, FLUX.2 Klein 9B FP8 with repeated encoder switching,
+and Wan Animate 2 with CPU/default and GPU/int8 cache. Hardware, runtime versions,
+model filenames, results, and remaining issues are in
+[the maintenance notes](docs/MAINTENANCE.md).
 
 ## Installation
 
-Clone this fork into your ComfyUI `custom_nodes` directory, then restart ComfyUI:
+Clone into ComfyUI's `custom_nodes` directory, then restart ComfyUI:
 
 ```sh
 cd /path/to/ComfyUI/custom_nodes
 git clone https://github.com/delfianto/ComfyUI-MultiGPU.git
 ```
 
-Use one MultiGPU checkout. Remove the upstream or image-bundled copy before
-loading this fork so duplicate nodes and global patches do not conflict.
-Optional integrations such as GGUF require their own provider nodes.
-
-## Source layout
-
-The Python implementation lives in `src/`. The small root `__init__.py` and
-`prestartup_script.py` files are ComfyUI entry points. Tests live in `tests/`,
-CI utilities in `ci/`, and all documentation in `docs/`. Node help pages in
-`docs/web/docs/` are also available through ComfyUI's in-app help. Documentation
-images and other assets live in `docs/assets/`; example workflows and their
-previews live in `docs/example_workflows/`.
+Keep only one MultiGPU checkout; remove any upstream or image-bundled copy to
+avoid duplicate nodes and patches. Optional integrations such as GGUF require
+their provider nodes.
 
 ## Documentation
 
-- [docs/README.md](docs/README.md): cleaned original usage guide, node catalog,
-  allocation modes, and example workflows. Historical upstream testing is
-  identified separately from this fork's tests.
-- [docs/MAINTENANCE.md](docs/MAINTENANCE.md): changes, bug fixes, remaining issues,
-  hardware, tested models, and development checks.
+- [Usage guide](docs/README.md): the cleaned original README, node catalog,
+  allocation modes, and examples.
+- [Maintenance notes](docs/MAINTENANCE.md): setup, fixes, issue tracker,
+  validation, source layout, and development checks.
 
 ## Credits and license
 
-Originally created by [Alexander Dzhoganov](https://github.com/AlexanderDzhoganov)
-and maintained upstream by [pollockjj](https://github.com/pollockjj), with
-contributions from City96 and other upstream contributors. This fork keeps the
-original [GPL-3.0 license](LICENSE) and attribution.
+Created by [Alexander Dzhoganov](https://github.com/AlexanderDzhoganov), maintained
+upstream by [pollockjj](https://github.com/pollockjj), with contributions from
+City96 and others. Licensed under [GPL-3.0](LICENSE).
