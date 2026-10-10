@@ -933,8 +933,10 @@ ltx_nodes = {"LTXVLoaderMultiGPU": override_class(LTXVLoader)}
 register_and_count(["ComfyUI-LTXVideo", "comfyui-ltxvideo"], ltx_nodes)
 
 florence_nodes = {
-    "Florence2ModelLoaderMultiGPU": override_class_offload(Florence2ModelLoader),
-    "DownloadAndLoadFlorence2ModelMultiGPU": override_class_offload(DownloadAndLoadFlorence2Model),
+    "Florence2ModelLoaderMultiGPU": override_class_offload(Florence2ModelLoader, text_encoder=True),
+    "DownloadAndLoadFlorence2ModelMultiGPU": override_class_offload(
+        DownloadAndLoadFlorence2Model, text_encoder=True
+    ),
 }
 register_and_count(["ComfyUI-Florence2", "comfyui-florence2"], florence_nodes)
 

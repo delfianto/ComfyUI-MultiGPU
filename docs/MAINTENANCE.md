@@ -62,7 +62,7 @@ unused-parameter, and deprecated-API warnings enabled. Host and optional-provide
 imports may be absent; [typings/nodes.pyi](../typings/nodes.pyi) supplies the core
 registry contract. Dynamic logger methods use an explicit `Any` boundary.
 
-As of 2026-10-10, all **51 regression tests** pass on the host and in the
+As of 2026-10-10, all **53 regression tests** pass on the host and in the
 production container. Ruff, formatting, basedpyright, and GitHub CI pass.
 
 ## Upstream triage
@@ -90,11 +90,10 @@ validated fix is available. Untested models/providers remain in those states.
 | High | [#202](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/202)/[#186](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/186); [PR #195](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/195) | fixed | aimdo initialization can omit visible GPUs or disturb existing contexts/headroom. | Initialize visible devices together before core startup; preserve primary headroom; do not reinitialize live contexts or mark missing devices initialized. Defer Torch import until core init_device; retain legacy fallback. CPU regressions pass. | - |
 | High | [#191](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/191) | fixed | DynamicVRAM bypasses DisTorch2 donor placement through the patched legacy loading path. | Use legacy ModelPatcher when loading explicitly distributed models; ordinary loaders keep DynamicVRAM. Restore patcher alias and loader device state on errors. Local FLUX donor placement and regressions pass. | - |
 | High | [#196](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/196); [PR #198](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/198) | fixed | Parameter estimates evaluate parametrized weights or miscount tied/packed storage. | Count unique underlying parameters by physical nbytes. Tests cover weight_norm, tied parameters, and packed storage; buffers and allocator overhead remain outside this estimate. | - |
-| Medium | [#188](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/188); [PR #200](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/200) | partial | Florence2 wrapper schema/arguments drift from the provider. | Delegate INPUT_TYPES and forward args/kwargs, including model_paths. Mock provider regressions pass; Florence2 is not installed locally. | Validate an actual Florence2 provider workflow. |
-| Medium | [PR #217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217) | partial | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. The alternative provider is not installed locally. | Validate loading with the alternative provider. |
+| Medium | [#188](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/188); [PR #200](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/200) | fixed | Florence2 wrapper schema/arguments drift from the provider; current loaders also consult the text-encoder device. | Delegate provider schema and arguments; set and restore both device selectors. Both actual Florence2-base loaders generate captions on cuda:1. See [validation](#optional-provider-validation-2026-10-10). | - |
+| Medium | [PR #217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217) | fixed | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. Its actual Qwen3-VL Q4 loader and text encoding pass on cuda:1. See [validation](#optional-provider-validation-2026-10-10). | - |
 | Medium | [PR #182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182) | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | - |
 
-Remaining validation needs the Florence2 and alternative GGUF providers.
 The GPU-disappearance report [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212)
 still needs a reproducible graph and driver logs from the affected hardware.
 
@@ -376,3 +375,32 @@ Prompts, storage measurements, histories, and crash traces are saved under
 `/srv/appdata/comfyui/user/default/workflow-backups/issue209/`; generated frames
 and audio are in the output directory's `issue209/` folder. Temporary probe
 nodes were removed after validation.
+
+## Optional provider validation (2026-10-10)
+
+Tested real provider checkouts in a separate process inside the production
+container, using isolated dependencies. These checkouts remain outside
+`custom_nodes`; the running service retains its city96 GGUF provider.
+
+- [kijai/ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2) at
+  `9ece3de`: both local and download/load MultiGPU nodes loaded
+  `microsoft/Florence-2-base` in fp16 and generated a caption from a 128×128
+  image. Only the MultiGPU schema was invoked before loading, exercising the
+  provider's `model_paths` initialization. Both patchers and all model
+  parameters used cuda:1. Before the device-selector fix, both patchers used
+  cuda:0 despite selecting cuda:1. Florence2 wrappers now set the text-encoder
+  selector alongside the UNet selector, preserving older provider behavior;
+  both selectors restore after success or failure. Regressions also cover
+  reordered optional arguments and async execution.
+- [ChrisColeTech/ComfyUI-GGUF-Loader](https://github.com/ChrisColeTech/ComfyUI-GGUF-Loader)
+  at `499df2a`: provider discovery registered the GGUF wrappers, and
+  `CLIPLoaderGGUFMultiGPU` delegated to that provider's class. Loading
+  `qwen3-vl-8b-uncensored-aggressive-q4-k-m.gguf` with type `qwen_image`
+  produced finite text embeddings of shape `[1, 512, 12288]`. The patcher
+  and all model parameters used cuda:1. This validates registration and
+  actual quantized text loading/encoding; it does not test the provider's
+  additional generation nodes or the Qwen vision projector.
+
+Private validation scripts, provider revisions and results are under
+`user/default/workflow-backups/provider-validation/`. The Florence2 base
+checkpoint remains in `models/LLM/Florence-2-base/` for reuse.

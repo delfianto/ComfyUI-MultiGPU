@@ -639,7 +639,7 @@ def override_class(cls):
     return NodeOverride
 
 
-def override_class_offload(cls):
+def override_class_offload(cls, *, text_encoder=False):
     """Standard MultiGPU device override for UNet/VAE models"""
     from . import (
         cuda_device_guard,
@@ -664,10 +664,15 @@ def override_class_offload(cls):
         FUNCTION = "override"
 
         def override(self, *args, device=None, offload_device=None, **kwargs):
+            from . import get_current_text_encoder_device, set_current_text_encoder_device
+
             original_device = get_current_device()
             original_offload_device = get_current_unet_offload_device()
+            original_text_device = get_current_text_encoder_device() if text_encoder else None
             if device is not None:
                 set_current_device(device)
+                if text_encoder:
+                    set_current_text_encoder_device(device)
             if offload_device is not None:
                 set_current_unet_offload_device(offload_device)
             target_device = device if device is not None else get_current_device()
@@ -680,6 +685,8 @@ def override_class_offload(cls):
             finally:
                 set_current_device(original_device)
                 set_current_unet_offload_device(original_offload_device)
+                if text_encoder:
+                    set_current_text_encoder_device(original_text_device)
 
     NodeOverride.override = adapt_loader_execution(cls, NodeOverride.override)
     return NodeOverride

@@ -103,6 +103,54 @@ class LoaderExecutionTests(unittest.TestCase):
         self.assertIs(self.patcher.CoreModelPatcher, self.core)
         self.assertEqual(self.cuda, 0)
 
+    def test_florence_selects_text_encoder_and_restores_both_device_scopes(self):
+        for asynchronous in (False, True):
+            for fail in (False, True):
+                with self.subTest(asynchronous=asynchronous, fail=fail):
+
+                    def check(fail=fail):
+                        self.assertEqual(self.state["device"], "cuda:1")
+                        self.assertEqual(self.state["text_encoder_device"], "cuda:1")
+                        self.assertEqual(self.state["unet_offload_device"], "cuda:0")
+                        self.assertEqual(self.cuda, 1)
+                        if fail:
+                            raise ValueError("Florence provider failed")
+                        return ({"patcher": object()},)
+
+                    def sync_load(_self, **kwargs):
+                        self.assertEqual(kwargs, {"model": "Florence-2-base", "precision": "fp16"})
+                        return check()
+
+                    async def async_load(_self, **kwargs):
+                        await asyncio.sleep(0)
+                        return sync_load(_self, **kwargs)
+
+                    provider = type(
+                        "FlorenceProvider",
+                        (),
+                        {
+                            "FUNCTION": "loadmodel",
+                            "loadmodel": async_load if asynchronous else sync_load,
+                        },
+                    )
+                    node = self.wrappers.override_class_offload(provider, text_encoder=True)()
+
+                    def execute(node=node, asynchronous=asynchronous):
+                        result = node.override(
+                            model="Florence-2-base",
+                            precision="fp16",
+                            device="cuda:1",
+                            offload_device="cuda:0",
+                        )
+                        return asyncio.run(result) if asynchronous else result
+
+                    if fail:
+                        with self.assertRaisesRegex(ValueError, "Florence provider failed"):
+                            execute()
+                    else:
+                        self.assertIn("patcher", execute()[0])
+                    self.assert_restored()
+
     def test_sync_results_failures_and_metadata(self):
         for factory, parameter, state_key, distributed in self.factories:
             for failure in (None, "provider", "output", "registration"):

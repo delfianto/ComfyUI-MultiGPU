@@ -416,6 +416,42 @@ class LoaderTests(unittest.TestCase):
                 model="new-model", precision="bf16", future_option=True
             )
 
+    def test_florence_schema_initializes_provider_paths_and_preserves_argument_order(self):
+        class Provider:
+            @classmethod
+            def INPUT_TYPES(cls):
+                cls.model_paths = {"Florence-2-base": "/models/LLM/Florence-2-base"}
+                return {"required": {"model": (list(cls.model_paths),), "precision": (["fp16"],)}}
+
+            def loadmodel(
+                self,
+                model,
+                precision,
+                lora=None,
+                convert_to_safetensors=False,
+                attention=None,
+                **kwargs,
+            ):
+                return (
+                    self.model_paths[model],
+                    precision,
+                    lora,
+                    convert_to_safetensors,
+                    attention,
+                    kwargs,
+                )
+
+        self.registry["Florence2ModelLoader"] = Provider
+        shim = self.nodes.Florence2ModelLoader
+        self.assertFalse(hasattr(Provider, "model_paths"))
+        shim.INPUT_TYPES()
+        self.assertEqual(
+            shim().loadmodel(
+                "Florence-2-base", "fp16", "adapter", True, attention="sdpa", future_option=42
+            ),
+            ("/models/LLM/Florence-2-base", "fp16", "adapter", True, "sdpa", {"future_option": 42}),
+        )
+
     def test_ltx_passes_unet_and_vae_config(self):
         upstream = Mock()
         self.registry["LTXVLoader"] = upstream
