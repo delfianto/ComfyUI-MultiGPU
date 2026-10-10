@@ -89,6 +89,72 @@ and WanVideo/LTX feature requests need their specific providers/models and
 reproductions before claiming fixes. This fork does not claim to resolve all open
 issues. The LTXV2 feature PR #164 is not merged as part of these crash fixes.
 
+## TODO
+
+Reviewed on 2026-10-10. Severity below is this fork's assessment of the reported
+impact; upstream does not assign severity labels. An open upstream report is
+not proof that the current fork still reproduces it. Existing related fixes
+need the original reproduction before we can claim these issues are resolved.
+
+- [ ] **High: restore device state when older GGUF loaders fail.** Some older
+  wrappers in `src/wrappers.py` call the provider before entering the
+  device-restoration `try/finally`. A loader exception can leave global device
+  state changed and affect later runs. Protect the entire operation and test
+  restoration after loader and result-processing failures. This is a concrete
+  code finding, not an established root cause of a particular upstream report.
+- [ ] **High: async loader compatibility —
+  [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203).** The report
+  describes async/await errors that prevent generation. Our wrappers still
+  assume synchronous provider results. Identify an affected provider/version,
+  preserve its execution contract, and keep device guards active until async
+  completion, failure, or cancellation. Test synchronous and asynchronous
+  providers. The upstream report lacks a precise reproducer, so the cause is
+  not yet confirmed.
+- [ ] **High: repeated-run CLIP corruption —
+  [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185).** Two different
+  encoders on GPU 1 reportedly produce garbled output after the second or third
+  generation, particularly with the Flux.2 Klein FP8 text encoder. Our runtime
+  device guard addresses related symptoms, but this scenario remains untested.
+  Reproduce repeated runs with FP8 and GGUF encoders, including model eviction
+  and reloads, and check conditioning consistency and device state.
+- [ ] **Critical: WanAnimate GPU/int8 cache process crash —
+  [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219).** The reported
+  GPU/int8 pose-cache path kills ComfyUI without a Python traceback; CPU/default
+  cache settings complete. The report uses comfy-kitchen 0.2.31, for which this
+  fork retains the legacy DLPack patch. Reproduce the official WanAnimate graph,
+  isolate the active patches, and investigate tensor lifetime, device, and
+  stream handling. Our native-DLPack handling for newer kitchen versions may
+  help, but it has not been validated with this workflow. Capture native crash
+  diagnostics in an isolated test process.
+- [ ] **Critical: Windows DynamicVRAM stack overflow —
+  [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184).** Reports
+  include failures even without MultiGPU nodes in the graph. A nonrecursive
+  dynamic loading guard already exists; audit its coverage across standard and
+  DisTorch loaders and test traversal behavior on Linux. Confirming the native
+  failure and its resolution requires the Windows reproduction. Do not assume
+  the existing guard resolves every reported configuration.
+- [ ] **High, partly addressed: mixed INT8/INT4 donor allocation —
+  [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209).** MiniMax H3
+  reportedly accepts the allocation string while donor VRAM remains nearly
+  empty. Our DynamicVRAM bypass and physical-storage accounting address likely
+  contributors, but mixed-quantization checkpoints still need validation.
+  Measure actual donor storage and loading/unloading behavior; a printed
+  allocation string or low donor compute utilization does not establish that
+  allocation succeeded or failed.
+- [ ] **Critical impact, uncertain cause: GPU disappears during MiniMax H3 —
+  [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212).** A four-RTX-3090
+  setup reportedly loses a GPU during generation. Obtain a reproducible graph,
+  driver/Xid logs, and comparisons with core device-selection nodes before
+  attributing the failure to this extension. It may overlap with the
+  cross-device crash family already addressed, but current evidence does not
+  support a targeted fix or a claim of resolution.
+
+Suggested implementation order: exception-safe GGUF wrappers, async provider
+compatibility, then repeated-run CLIP validation. Follow with WanAnimate and
+mixed-quantization MiniMax reproductions. Windows stack-overflow confirmation
+and the GPU-disappearance report need their specific environments and evidence.
+This is a backlog for personal maintenance, not a support or delivery promise.
+
 ## Source layout
 
 Runtime Python modules live in `src/`; `src/__init__.py` registers nodes and
