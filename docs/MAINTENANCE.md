@@ -414,6 +414,18 @@ nonblank decoded images and finite, nonzero 48 kHz stereo audio. These short,
 low-resolution runs validate execution rather than production quality. No
 additional runtime patch was needed.
 
+Follow-up motion-artifact tests found ghosting around moving edges with
+`VAEDecodeTiled` at temporal size 16, overlap 8. Decoding the **same final latent**
+with `VAEDecode` removed the doubled edges in inspected frames at both 512×512
+and 768×768, without OOM or automatic tiled fallback on the 3060. The higher
+resolution run used 384×384 base latents and completed in 203.60 seconds.
+Spatial tiling at size 256, overlap 64, with temporal size **64** also removed
+the ghosting in the inspected 33-frame clip; only decoding reran (5.73 seconds).
+This isolates the short temporal window as the cause in this test, rather than
+MP4 encoding or GPU placement. Longer clips need separate validation.
+The saved production prompts now use untiled decoding; a 768×768 variant and
+both comparison graphs are retained with the local test artifacts.
+
 Temporary probes were removed afterward. Prompts, histories, storage and
 finite-value measurements, and a probe-free `two-stage-production-prompt.json`
 are saved under
