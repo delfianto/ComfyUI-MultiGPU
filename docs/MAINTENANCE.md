@@ -101,7 +101,8 @@ them there:
 - `__init__.py` exposes the node mappings and forwards historical helper
   attributes to `src`. Its `WEB_DIRECTORY` points to `docs/web/`, with node
   help pages in `docs/web/docs/` to preserve ComfyUI's `docs/<node>.md` help
-  route. Documentation assets live in `docs/assets/`.
+  route. Documentation assets live in `docs/assets/`, and the original example
+  workflows and previews live in `docs/example_workflows/`.
 - `prestartup_script.py` executes `src/prestartup_script.py` directly. It avoids
   importing the runtime package or Torch before core configures CUDA visibility.
 

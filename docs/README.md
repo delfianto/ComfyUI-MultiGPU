@@ -168,48 +168,48 @@ historical upstream results. This fork's tests use an RTX 4080 + RTX 3060; see
 <table>
   <tr>
     <td align="center">
-      <a href="../example_workflows/ltxvideo%20checkpointloadersimple%20distorch2.json">
-        <img src="../example_workflows/ltxvideo%20checkpointloadersimple%20distorch2.jpg" alt="LTX Video + CheckpointLoaderSimple (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ltxvideo%20checkpointloadersimple%20distorch2.json">
+        <img src="example_workflows/ltxvideo%20checkpointloadersimple%20distorch2.jpg" alt="LTX Video + CheckpointLoaderSimple (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>LTX Video + CheckpointLoaderSimple (DisTorch2)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/mochi%20checkpointloaderadvanced%20distorch2.json">
-        <img src="../example_workflows/mochi%20checkpointloaderadvanced%20distorch2.jpg" alt="Mochi + CheckpointLoaderAdvanced (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/mochi%20checkpointloaderadvanced%20distorch2.json">
+        <img src="example_workflows/mochi%20checkpointloaderadvanced%20distorch2.jpg" alt="Mochi + CheckpointLoaderAdvanced (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>Mochi + CheckpointLoaderAdvanced (DisTorch2)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/qwen_image%20unet%20clip%20distorch2.json">
-        <img src="../example_workflows/qwen_image%20unet%20clip%20distorch2.jpg" alt="Qwen Image UNet + CLIP (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/qwen_image%20unet%20clip%20distorch2.json">
+        <img src="example_workflows/qwen_image%20unet%20clip%20distorch2.jpg" alt="Qwen Image UNet + CLIP (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>Qwen Image UNet + CLIP (DisTorch2)</div>
       </a>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <a href="../example_workflows/qwen_image_edit_2509%20unet%20clip%20distorch2.json">
-        <img src="../example_workflows/qwen_image_edit_2509%20unet%20clip%20distorch2.jpg" alt="Qwen Image Edit UNet + CLIP (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/qwen_image_edit_2509%20unet%20clip%20distorch2.json">
+        <img src="example_workflows/qwen_image_edit_2509%20unet%20clip%20distorch2.jpg" alt="Qwen Image Edit UNet + CLIP (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>Qwen Image Edit UNet + CLIP (DisTorch2)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/wan2_2%20distorch2%20double_unet%20no_cpu.json">
-        <img src="../example_workflows/wan2_2%20distorch2%20double_unet%20no_cpu.jpg" alt="WanVideo 2.2 Double UNet, No CPU (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/wan2_2%20distorch2%20double_unet%20no_cpu.json">
+        <img src="example_workflows/wan2_2%20distorch2%20double_unet%20no_cpu.jpg" alt="WanVideo 2.2 Double UNet, No CPU (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>WanVideo 2.2 Double UNet, No CPU (DisTorch2)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/wan2_2%20t2i%20lightx2v%20lora%20distorch2.json">
-        <img src="../example_workflows/wan2_2%20t2i%20lightx2v%20lora%20distorch2.jpg" alt="WanVideo 2.2 T2I LightX2V LoRA (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/wan2_2%20t2i%20lightx2v%20lora%20distorch2.json">
+        <img src="example_workflows/wan2_2%20t2i%20lightx2v%20lora%20distorch2.jpg" alt="WanVideo 2.2 T2I LightX2V LoRA (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>WanVideo 2.2 T2I LightX2V LoRA (DisTorch2)</div>
       </a>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <a href="../example_workflows/wan2_2%20t2v%20lightx2v%20lora%20distorch2.json">
-        <img src="../example_workflows/wan2_2%20t2v%20lightx2v%20lora%20distorch2.jpg" alt="WanVideo 2.2 T2V LightX2V LoRA (DisTorch2)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/wan2_2%20t2v%20lightx2v%20lora%20distorch2.json">
+        <img src="example_workflows/wan2_2%20t2v%20lightx2v%20lora%20distorch2.jpg" alt="WanVideo 2.2 T2V LightX2V LoRA (DisTorch2)" style="max-width:160px; max-height:160px;">
         <div>WanVideo 2.2 T2V LightX2V LoRA (DisTorch2)</div>
       </a>
     </td>
@@ -223,20 +223,20 @@ historical upstream results. This fork's tests use an RTX 4080 + RTX 3060; see
 <table>
   <tr>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_T2V.json">
-        <img src="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_T2V.jpg" alt="WanVideoWrapper T2V" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_T2V.json">
+        <img src="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_T2V.jpg" alt="WanVideoWrapper T2V" style="max-width:160px; max-height:160px;">
         <div>WanVideoWrapper T2V</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_1_3B%20control_lora.json">
-        <img src="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_1_3B%20control_lora.jpg" alt="WanVideoWrapper 1.3B Control LoRA" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_1_3B%20control_lora.json">
+        <img src="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo_1_3B%20control_lora.jpg" alt="WanVideoWrapper 1.3B Control LoRA" style="max-width:160px; max-height:160px;">
         <div>WanVideoWrapper 1.3B Control LoRA</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo2_2%20I2V%20A14B%20GGUF.json">
-        <img src="../example_workflows/ComfyUI-WanVideoWrapper%20wanvideo2_2%20I2V%20A14B%20GGUF.jpg" alt="WanVideoWrapper 2.2 I2V A14B GGUF" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo2_2%20I2V%20A14B%20GGUF.json">
+        <img src="example_workflows/ComfyUI-WanVideoWrapper%20wanvideo2_2%20I2V%20A14B%20GGUF.jpg" alt="WanVideoWrapper 2.2 I2V A14B GGUF" style="max-width:160px; max-height:160px;">
         <div>WanVideoWrapper 2.2 I2V A14B GGUF</div>
       </a>
     </td>
@@ -248,20 +248,20 @@ historical upstream results. This fork's tests use an RTX 4080 + RTX 3060; see
 <table>
   <tr>
     <td align="center">
-      <a href="../example_workflows/flux%20unet%20dual_clip%20vae%20loaders.json">
-        <img src="../example_workflows/flux%20unet%20dual_clip%20vae%20loaders.jpg" alt="FLUX UNet + Dual CLIP + VAE Loaders (MultiGPU)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/flux%20unet%20dual_clip%20vae%20loaders.json">
+        <img src="example_workflows/flux%20unet%20dual_clip%20vae%20loaders.jpg" alt="FLUX UNet + Dual CLIP + VAE Loaders (MultiGPU)" style="max-width:160px; max-height:160px;">
         <div>FLUX UNet + Dual CLIP + VAE Loaders (MultiGPU)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/sd15%20checkpoint%20loader%20simple.json">
-        <img src="../example_workflows/sd15%20checkpoint%20loader%20simple.jpg" alt="SD15 CheckpointLoaderSimple (MultiGPU)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/sd15%20checkpoint%20loader%20simple.json">
+        <img src="example_workflows/sd15%20checkpoint%20loader%20simple.jpg" alt="SD15 CheckpointLoaderSimple (MultiGPU)" style="max-width:160px; max-height:160px;">
         <div>SD15 CheckpointLoaderSimple (MultiGPU)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/sdxl%20checkpoint%20loader%20advanced.json">
-        <img src="../example_workflows/sdxl%20checkpoint%20loader%20advanced.jpg" alt="SDXL CheckpointLoaderAdvanced (MultiGPU)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/sdxl%20checkpoint%20loader%20advanced.json">
+        <img src="example_workflows/sdxl%20checkpoint%20loader%20advanced.jpg" alt="SDXL CheckpointLoaderAdvanced (MultiGPU)" style="max-width:160px; max-height:160px;">
         <div>SDXL CheckpointLoaderAdvanced (MultiGPU)</div>
       </a>
     </td>
@@ -273,14 +273,14 @@ historical upstream results. This fork's tests use an RTX 4080 + RTX 3060; see
 <table>
   <tr>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-GGUF%20flux%20unet%20dual_clip%20loaders.json">
-        <img src="../example_workflows/ComfyUI-GGUF%20flux%20unet%20dual_clip%20loaders.jpg" alt="FLUX UNet + Dual CLIP GGUF" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-GGUF%20flux%20unet%20dual_clip%20loaders.json">
+        <img src="example_workflows/ComfyUI-GGUF%20flux%20unet%20dual_clip%20loaders.jpg" alt="FLUX UNet + Dual CLIP GGUF" style="max-width:160px; max-height:160px;">
         <div>FLUX UNet + Dual CLIP GGUF</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-GGUF%20qwen_image%20unet%20distorch2%20cliploader.json">
-        <img src="../example_workflows/ComfyUI-GGUF%20qwen_image%20unet%20distorch2%20cliploader.jpg" alt="Qwen Image UNet DisTorch2 GGUF" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-GGUF%20qwen_image%20unet%20distorch2%20cliploader.json">
+        <img src="example_workflows/ComfyUI-GGUF%20qwen_image%20unet%20distorch2%20cliploader.jpg" alt="Qwen Image UNet DisTorch2 GGUF" style="max-width:160px; max-height:160px;">
         <div>Qwen Image UNet DisTorch2 GGUF</div>
       </a>
     </td>
@@ -293,14 +293,14 @@ historical upstream results. This fork's tests use an RTX 4080 + RTX 3060; see
 <table>
   <tr>
     <td align="center">
-      <a href="../example_workflows/hunyuanvideo%20distorch%20DEPRECATED.json">
-        <img src="../example_workflows/hunyuanvideo%20distorch%20DEPRECATED.jpg" alt="HunyuanVideoWrapper DisTorch (Legacy, Deprecated)" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/hunyuanvideo%20distorch%20DEPRECATED.json">
+        <img src="example_workflows/hunyuanvideo%20distorch%20DEPRECATED.jpg" alt="HunyuanVideoWrapper DisTorch (Legacy, Deprecated)" style="max-width:160px; max-height:160px;">
         <div>HunyuanVideoWrapper DisTorch (Legacy, Deprecated)</div>
       </a>
     </td>
     <td align="center">
-      <a href="../example_workflows/ComfyUI-Florence2%20detailed_caption%20to%20flux.json">
-        <img src="../example_workflows/ComfyUI-Florence2%20detailed_caption%20to%20flux.jpg" alt="Florence2 Detailed Caption to FLUX Pipeline" style="max-width:160px; max-height:160px;">
+      <a href="example_workflows/ComfyUI-Florence2%20detailed_caption%20to%20flux.json">
+        <img src="example_workflows/ComfyUI-Florence2%20detailed_caption%20to%20flux.jpg" alt="Florence2 Detailed Caption to FLUX Pipeline" style="max-width:160px; max-height:160px;">
         <div>Florence2 Detailed Caption to FLUX Pipeline</div>
       </a>
     </td>

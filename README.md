@@ -58,7 +58,8 @@ The Python implementation lives in `src/`. The small root `__init__.py` and
 `prestartup_script.py` files are ComfyUI entry points. Tests live in `tests/`,
 CI utilities in `ci/`, and all documentation in `docs/`. Node help pages in
 `docs/web/docs/` are also available through ComfyUI's in-app help. Documentation
-images and other assets live in `docs/assets/`.
+images and other assets live in `docs/assets/`; example workflows and their
+previews live in `docs/example_workflows/`.
 
 ## Documentation
 
