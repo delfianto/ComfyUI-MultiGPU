@@ -69,100 +69,43 @@ that capture a different class in their closure.
 ## Upstream triage
 
 [Archive thread #223](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/223)
-identifies proposed PRs, not validated fixes. Priority is process crashes first,
-then incorrect GPU allocation, then optional-provider compatibility.
+identifies proposed PRs, not validated fixes. Reviewed on 2026-10-10.
+Severity is this fork's assessment; upstream does not assign severity labels.
+An open upstream report does not establish that the current fork reproduces it.
 
 Status describes this fork: `fixed` means the targeted defect is addressed and
 validated; `partial` means related changes exist but coverage or the original
 reproduction remains unverified; `open` means no validated fix is available.
+The table tracks implemented changes and remaining work together.
 
-| Priority | Reports | Status | Change and validation |
-| --- | --- | --- | --- |
-| Critical | #187, #210, #218, #220; PR #216 | partial | Prefer Torch's peer API; resolve versioned/Linux and Windows runtimes; all probe failures return false. CPU regressions cover success, failures, caching and platform candidates. Windows runtime execution still needs a Windows rig. |
-| Critical | #211, #213, #222 | partial | Keep comfy-kitchen >=0.2.35 native DLPack exports. Moving tensors inside a per-argument export wrapper can conflict with the kernel's actual device/stream. Older kitchen versions retain the guarded compatibility path and are not validated here. |
-| Critical | Local FP8 CLIP crash; #189/#185 related symptoms | partial | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device, restoring device state on exceptions. CLIP nesting and VAE regressions plus local dual-GPU generation. Similar symptoms alone do not establish that every upstream reproduction is fixed. |
-| Critical | #184; PR #183 | partial | Install the dynamic loading traversal guard at node startup, covering DisTorch2 and core-only loaders before any standard MultiGPU CLIP node runs. Match core parent-module classification and deduplicate shared modules in the parameter walker. Deep-graph CPU regressions and a local empty-allocation DisTorch2 generation pass; the Windows native crash still needs its original reproduction. |
-| High | #202/#186; PR #195 | fixed | Initialize visible aimdo devices together before core startup. Preserve the primary GPU's headroom; never reinitialize live contexts or report missing devices as initialized. Defer Torch import until core calls init_device. Existing per-device legacy fallback remains. |
-| High | #191 | fixed | DisTorch2 uses legacy ModelPatcher while loading an explicitly distributed model; DynamicVRAM otherwise bypasses donor placement in the patched legacy loading path. Ordinary loaders keep DynamicVRAM. Preserve patcher alias and loader device state on errors. |
-| High | #196; PR #198 | fixed | Count unique underlying model parameters by physical nbytes without evaluating parametrized weight properties. Tests cover weight_norm, tied parameters, and packed storage. Buffers and allocator overhead are not included in the parameter estimate. |
-| Medium | #188; PR #200 | partial | Florence2 delegates INPUT_TYPES and forwards args/kwargs so schema changes and upstream model_paths initialization stay intact. Mock provider regressions; Florence2 is not installed locally. |
-| Medium | PR #217 | partial | Recognize ComfyUI-GGUF-Loader as an additional provider. Existing city96 provider remains supported. The alternative provider is not installed locally. |
-| Medium | PR #182 | fixed | Copy the schema and modified optional map without recursively copying metadata. Regression checks upstream schema isolation with noncopyable metadata. |
-
-Other open reports remain tracked upstream. #219's WanAnimate2Cache int8 crash,
-#203's async-provider signature changes, repeat-run model corruption (#185),
-and WanVideo/LTX feature requests need their specific providers/models and
-reproductions before claiming fixes. This fork does not claim to resolve all open
-issues. The LTXV2 feature PR #164 is not merged as part of these crash fixes.
-
-## TODO
-
-Reviewed on 2026-10-10. Severity below is this fork's assessment of the reported
-impact; upstream does not assign severity labels. An open upstream report is
-not proof that the current fork still reproduces it. Existing related fixes
-need the original reproduction before we can claim these issues are resolved.
-
-- [ ] **High: restore device state when older GGUF loaders fail.** Some older
-  wrappers in `src/wrappers.py` call the provider before entering the
-  device-restoration `try/finally`. A loader exception can leave global device
-  state changed and affect later runs. Protect the entire operation and test
-  restoration after loader and result-processing failures. This is a concrete
-  code finding, not an established root cause of a particular upstream report.
-- [ ] **High: async loader compatibility —
-  [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203).** The report
-  describes async/await errors that prevent generation. Our wrappers still
-  assume synchronous provider results. Identify an affected provider/version,
-  preserve its execution contract, and keep device guards active until async
-  completion, failure, or cancellation. Test synchronous and asynchronous
-  providers. The upstream report lacks a precise reproducer, so the cause is
-  not yet confirmed.
-- [ ] **High: repeated-run CLIP corruption —
-  [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185).** Two different
-  encoders on GPU 1 reportedly produce garbled output after the second or third
-  generation, particularly with the Flux.2 Klein FP8 text encoder. Our runtime
-  device guard addresses related symptoms, but this scenario remains untested.
-  Reproduce repeated runs with FP8 and GGUF encoders, including model eviction
-  and reloads, and check conditioning consistency and device state.
-- [ ] **Critical: WanAnimate GPU/int8 cache process crash —
-  [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219).** The reported
-  GPU/int8 pose-cache path kills ComfyUI without a Python traceback; CPU/default
-  cache settings complete. The report uses comfy-kitchen 0.2.31, for which this
-  fork retains the legacy DLPack patch. Reproduce the official WanAnimate graph,
-  isolate the active patches, and investigate tensor lifetime, device, and
-  stream handling. Local validation with kitchen 0.2.37 now passes 49-frame
-  GPU/int8 generation and 81-frame CPU/default generation. The 81-frame GPU/int8
-  cases return ordinary OOM errors without killing the service. See
-  [WanAnimate cache validation](#wananimate-cache-validation-2026-10-10).
-  The original Windows/older-kitchen native crash remains unverified; capture
-  native crash diagnostics in an isolated test process if it reproduces.
-- [ ] **Critical, partly addressed: Windows DynamicVRAM stack overflow —
-  [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184).** Reports
-  include failures even without MultiGPU nodes in the graph. Fixed the guard's
-  registration gap and fallback parent classification; Linux CPU and live
-  DisTorch2 tests pass. See [Dynamic loading validation](#dynamic-loading-validation-2026-10-10).
-  Confirming the native failure and its resolution requires the Windows
-  reproduction. Do not assume this resolves every reported configuration.
-- [ ] **High, partly addressed: mixed INT8/INT4 donor allocation —
-  [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209).** MiniMax H3
-  reportedly accepts the allocation string while donor VRAM remains nearly
-  empty. Our DynamicVRAM bypass and physical-storage accounting address likely
-  contributors, but mixed-quantization checkpoints still need validation.
-  Measure actual donor storage and loading/unloading behavior; a printed
-  allocation string or low donor compute utilization does not establish that
-  allocation succeeded or failed.
-- [ ] **Critical impact, uncertain cause: GPU disappears during MiniMax H3 —
-  [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212).** A four-RTX-3090
-  setup reportedly loses a GPU during generation. Obtain a reproducible graph,
-  driver/Xid logs, and comparisons with core device-selection nodes before
-  attributing the failure to this extension. It may overlap with the
-  cross-device crash family already addressed, but current evidence does not
-  support a targeted fix or a claim of resolution.
+| Priority | Reports | Status | Problem | Fix and validation | Next step |
+| --- | --- | --- | --- | --- | --- |
+| Critical | #187, #210, #218, #220; PR #216 | partial | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve versioned Linux and Windows runtimes; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. | Validate runtime execution on Windows hardware. |
+| Critical | #211, #213, #222 | partial | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep comfy-kitchen >=0.2.35 native exports. Older versions retain the compatibility patch and are unvalidated here. | Reproduce affected older-kitchen configurations and inspect tensor lifetime, device, and stream handling. |
+| Critical | Local FP8 CLIP crash; #189 related symptoms | partial | CLIP/VAE inference can execute under the wrong current device. | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device; restore state on exceptions. CPU regressions and local dual-GPU generation pass. | Validate the original upstream reproduction; similar symptoms do not establish resolution. Repeated-run #185 is tracked separately below. |
+| Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); PR #183 | partial | Windows DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | Reproduce the native C-stack failure and verify the fix on the original Windows/ZImage setup. |
+| Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | partial | WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback on Windows/kitchen 0.2.31. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. No targeted fix for the original native crash is established. See [validation](#wananimate-cache-validation-2026-10-10). | Reproduce the Windows/older-kitchen case in an isolated process; capture native crash diagnostics and inspect active patches, tensor lifetime, device, and streams. |
+| Critical | [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212) | open | A GPU reportedly disappears during MiniMax H3 generation on four RTX 3090s; cause is uncertain. | No targeted fix established. Cross-device fixes may be related, but current evidence cannot establish causation or resolution. | Obtain a reproducible graph, driver/Xid logs, and comparisons with core device-selection nodes on the affected hardware. |
+| High | Local code finding: older GGUF wrappers | open | Provider calls occur before device-restoration try/finally; failures can leave global device state changed. | No fix yet. This is a confirmed code finding, not an established cause of a specific upstream report. | Protect the entire operation in src/wrappers.py; test restoration after provider and result-processing failures. **Next implementation item.** |
+| High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | open | Async/await errors prevent generation; wrappers assume synchronous results. | No fix yet; the report lacks a precise reproducer, so its cause remains unconfirmed. | Identify the affected provider/version; preserve its execution contract and device guards through completion, failure, and cancellation. Test synchronous and async providers. |
+| High | [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) | partial | Switching encoders on GPU 1 reportedly produces garbled output after two or three runs, particularly Flux.2 Klein FP8. | Runtime device guards address related symptoms; this repeated-run scenario is untested. | Test FP8/GGUF encoder switching, eviction, and reloads; compare conditioning consistency and device state. |
+| High | [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209) | partial | MiniMax H3 mixed INT8/INT4 allocation is accepted while donor VRAM reportedly stays nearly empty. | DynamicVRAM bypass and physical-storage accounting address likely contributors; mixed-quantization checkpoints remain unvalidated. | Measure actual live donor tensor storage and load/unload behavior. Allocation logs and low donor compute utilization do not prove placement. |
+| High | #202/#186; PR #195 | fixed | aimdo initialization can omit visible GPUs or disturb existing contexts/headroom. | Initialize visible devices together before core startup; preserve primary headroom; do not reinitialize live contexts or mark missing devices initialized. Defer Torch import until core init_device; retain legacy fallback. CPU regressions pass. | None for the validated initialization defect. |
+| High | #191 | fixed | DynamicVRAM bypasses DisTorch2 donor placement through the patched legacy loading path. | Use legacy ModelPatcher when loading explicitly distributed models; ordinary loaders keep DynamicVRAM. Restore patcher alias and loader device state on errors. Local FLUX donor placement and regressions pass. | Mixed-quantization validation is tracked separately under #209. |
+| High | #196; PR #198 | fixed | Parameter estimates evaluate parametrized weights or miscount tied/packed storage. | Count unique underlying parameters by physical nbytes. Tests cover weight_norm, tied parameters, and packed storage; buffers and allocator overhead remain outside this estimate. | None for the validated parameter-accounting defect. |
+| Medium | #188; PR #200 | partial | Florence2 wrapper schema/arguments drift from the provider. | Delegate INPUT_TYPES and forward args/kwargs, including model_paths. Mock provider regressions pass; Florence2 is not installed locally. | Validate an actual Florence2 provider workflow. |
+| Medium | PR #217 | partial | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. The alternative provider is not installed locally. | Validate loading with the alternative provider. |
+| Medium | PR #182 | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | None for the validated schema-copying defect. |
 
 Suggested implementation order: exception-safe GGUF wrappers, async provider
-compatibility, then repeated-run CLIP validation. Follow with WanAnimate and
-mixed-quantization MiniMax reproductions. Windows stack-overflow confirmation
-and the GPU-disappearance report need their specific environments and evidence.
-This is a backlog for personal maintenance, not a support or delivery promise.
+compatibility, repeated-run CLIP validation, then mixed-quantization MiniMax
+validation. Confirming the remaining Windows crashes and GPU-disappearance
+report requires their specific environments and evidence. The local WanAnimate
+validation is documented below; its original native crash remains unverified.
+
+WanVideo/LTX feature requests are outside this crash-fix tracker. LTXV2 PR #164
+has not been merged. This fork does not claim to resolve all upstream issues;
+this is a personal maintenance backlog, not a support or delivery promise.
 
 ## Source layout
 
