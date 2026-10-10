@@ -40,6 +40,8 @@ Completed generation tests:
 | Wan Animate 2 distilled INT8 ConvRot | `wan-animate-2-distill-int8-convrot.safetensors`; `umt5-xxl-fp8-e4m3fn-scaled.safetensors`; `clip-vision-h.safetensors`; `wan-v2.1-vae-bf16.safetensors` | 480×832, 10 steps: 49 frames passed with CPU/default and GPU/int8 cache; 81 frames passed with CPU/default cache. See the cache validation below for OOM cases and limits. |
 | MiniMax H3 mixed INT4/INT8 + INT4 encoder | FL2VA and REF2VA pruned ConvRot checkpoints; Qwen3-VL-32B INT4 ConvRot; MiniMax video FP16 and audio FP32 VAEs | Both variants passed 128×128, 5-frame, 2-step AV sampling and decoding. Donor storage remains about 5.96 GiB throughout sampling; CLIP and both VAEs execute on the 3060. See [validation](#minimax-mixed-quantization-validation-2026-10-10). |
 
+| LTX-2.5 distilled INT8 ConvRot | Gemma4-12B INT8 ConvRot; video/audio BF16 VAEs; spatial 2× latent upscaler | 9-frame smoke test and two 33-frame, 256×256 → 512×512 AV generations passed. Diffusion uses both GPUs; encoder uses the 3060 and CPU. See [validation](#ltx-25-validation-2026-10-10). |
+
 A 2-step smoke test checks execution, not final image quality.
 
 ## Development checks
@@ -371,6 +373,53 @@ Prompts, storage measurements, histories, and crash traces are saved under
 `/srv/appdata/comfyui/user/default/workflow-backups/issue209/`; generated frames
 and audio are in the output directory's `issue209/` folder. Temporary probe
 nodes were removed after validation.
+
+## LTX-2.5 validation (2026-10-10)
+
+Tested the split ComfyUI models:
+
+- `ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors`
+- `gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors`
+- `ltx-2.5-video-vae-conv-bf16.safetensors`
+- `ltx-2.5-audio-vae-bf16.safetensors`
+- `ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors`
+
+All five files match the official Lightricks revision's SHA256 hashes. The graph
+uses native LTX nodes with this fork's generic loaders; PR #164 adapters are
+unnecessary for this split-model configuration. Optional prompt enhancement
+was skipped.
+
+Diffusion uses `UNETLoaderDisTorch2MultiGPU`: compute on cuda:0, 9 GiB virtual
+VRAM donated from cuda:1. The Gemma encoder uses `CLIPLoaderDisTorch2MultiGPU`
+with type `ltxv`, compute on cuda:1 and 6 GiB donated from CPU. Both VAEs use
+`VAELoaderMultiGPU` on cuda:1. All loaders retain `eject_models=False` where
+available.
+
+| Test | Sampling | Result | Execution time |
+| --- | --- | --- | --- |
+| Smoke | 128×128, 9 frames, 8 steps | Video and audio passed | 44.47 s |
+| Two-stage | 256×256, 33 frames, 8 steps; spatial 2× upscale and 3-step refinement | 512×512 video and audio passed | 65.39 s |
+| Fresh-process repeat | Same two-stage graph after restarting ComfyUI | Decoded frames and audio finite | 69.28 s wall time |
+
+Sampling uses the official distilled template's sigma schedules,
+`euler_ancestral`, video/audio CFG 1 and 24 fps. Measured transformer storage
+remained 11,335.21 MiB on the 4080 and 9,151.95 MiB on the 3060 across all
+11 sampling calls in both two-stage runs. Encoder storage during encoding was
+about 8.28 GiB on the 3060 and 6.01 GiB on CPU. Donor-aware eviction allowed
+encoding, sampling, upscaling and decoding to share the secondary GPU.
+
+The saved MP4 contains 33 frames at 512×512 with an audio stream. Visual
+inspection shows a coherent blue teapot scene; repeat checks found finite,
+nonblank decoded images and finite, nonzero 48 kHz stereo audio. These short,
+low-resolution runs validate execution rather than production quality. No
+additional runtime patch was needed.
+
+Temporary probes were removed afterward. Prompts, histories, storage and
+finite-value measurements, and a probe-free `two-stage-production-prompt.json`
+are saved under
+`/srv/appdata/comfyui/user/default/workflow-backups/ltx25-validation/`.
+Videos, frames and audio are under
+`/home/geist/Pictures/StableDiffusion/ltx25-validation/`.
 
 ## Optional provider validation (2026-10-10)
 

@@ -22,7 +22,8 @@ diffusion and an **RTX 3060 12 GB** for CLIP/VAE and donor storage.
 
 Tested configurations include Krea2 RAW FP8 with LoRA and DyPE, FLUX.1-dev FP8
 with DisTorch2 and DyPE, FLUX.2 Klein 9B FP8 with repeated encoder switching,
-Wan Animate 2 with CPU/default and GPU/int8 cache, and MiniMax H3 mixed INT4/INT8.
+Wan Animate 2 with CPU/default and GPU/int8 cache, MiniMax H3 mixed INT4/INT8,
+and LTX-2.5 distilled INT8 ConvRot with audio and two-stage spatial upscaling.
 Hardware, runtime versions, model filenames, results, and remaining issues are in
 [the maintenance notes](docs/MAINTENANCE.md).
 
