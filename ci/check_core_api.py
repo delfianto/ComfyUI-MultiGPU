@@ -16,6 +16,9 @@ def main():
     sys.path.insert(0, str(core))
     # Core parses argv while importing model management. No GPU is required here.
     sys.argv = [str(core / "main.py"), "--cpu"]
+    import comfy.options
+
+    comfy.options.enable_args_parsing()
     import comfy.model_management as mm
     import comfy.model_patcher as mp
     import comfy.sd
@@ -25,6 +28,7 @@ def main():
 
     import nodes
 
+    assert mm.cpu_state == mm.CPUState.CPU, "Stable API audit must use CPU mode"
     required = {
         "CheckpointLoaderAdvancedMultiGPU",
         "CheckpointLoaderAdvancedDisTorch2MultiGPU",
