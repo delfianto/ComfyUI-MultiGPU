@@ -7,8 +7,8 @@ import os
 import sys
 import time
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
 
 import requests
 import websocket
@@ -30,7 +30,14 @@ def _write_stderr(message: str) -> None:
 
 
 class ComfyWorkflowRunner:
-    def __init__(self, host: str, port: int, connect_timeout: int, workflow_timeout: int, secure: bool = False) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        connect_timeout: int,
+        workflow_timeout: int,
+        secure: bool = False,
+    ) -> None:
         self.host = host
         self.port = port
         protocol_http = "https" if secure else "http"
@@ -41,7 +48,7 @@ class ComfyWorkflowRunner:
         self.workflow_timeout = workflow_timeout
         self.client_id = str(uuid.uuid4())
         self.session = requests.Session()
-        self.websocket: Optional[websocket.WebSocket] = None
+        self.websocket: websocket.WebSocket | None = None
 
     def wait_for_server(self) -> None:
         deadline = time.monotonic() + self.connect_timeout
@@ -185,13 +192,29 @@ class ComfyWorkflowRunner:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run ComfyUI workflows via the HTTP/WebSocket API")
-    parser.add_argument("workflows", nargs="+", type=Path, help="Workflow files in ComfyUI API JSON format")
+    parser.add_argument(
+        "workflows", nargs="+", type=Path, help="Workflow files in ComfyUI API JSON format"
+    )
     parser.add_argument("--host", default=DEFAULT_HOST, help="ComfyUI HTTP host")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="ComfyUI HTTP port")
-    parser.add_argument("--connect-timeout", type=int, default=DEFAULT_CONNECT_TIMEOUT, help="Seconds to wait for the server to come online")
-    parser.add_argument("--workflow-timeout", type=int, default=DEFAULT_WORKFLOW_TIMEOUT, help="Seconds to wait for each workflow to finish")
+    parser.add_argument(
+        "--connect-timeout",
+        type=int,
+        default=DEFAULT_CONNECT_TIMEOUT,
+        help="Seconds to wait for the server to come online",
+    )
+    parser.add_argument(
+        "--workflow-timeout",
+        type=int,
+        default=DEFAULT_WORKFLOW_TIMEOUT,
+        help="Seconds to wait for each workflow to finish",
+    )
     parser.add_argument("--fail-fast", action="store_true", help="Stop on first workflow failure")
-    parser.add_argument("--secure", action="store_true", help="Use secure HTTPS/WSS connections (default: insecure for localhost)")
+    parser.add_argument(
+        "--secure",
+        action="store_true",
+        help="Use secure HTTPS/WSS connections (default: insecure for localhost)",
+    )
     return parser.parse_args()
 
 

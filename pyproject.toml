@@ -5,7 +5,7 @@ version = "2.6.4"
 license = {file = "LICENSE"}
 
 [project.urls]
-Repository = "https://github.com/pollockjj/ComfyUI-MultiGPU"
+Repository = "https://github.com/delfianto/ComfyUI-MultiGPU"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
@@ -13,78 +13,34 @@ PublisherId = "pollockjj"
 DisplayName = "ComfyUI-MultiGPU"
 Icon = "https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/multigpu_icon.png"
 
+[dependency-groups]
+dev = ["ruff>=0.17,<0.18", "basedpyright>=1.39,<2", "packaging>=24"]
+
 [tool.ruff]
-lint.select = [
-  "N805", # invalid-first-argument-name-for-method
-  "S307", # suspicious-eval-usage
-  "S102", # exec
-  "E",
-  "T",    # print-usage
-  "W",
-  # The "F" series in Ruff stands for "Pyflakes" rules, which catch various Python syntax errors and undefined names.
-  # See all rules here: https://docs.astral.sh/ruff/rules/#pyflakes-f
-  "F",
-]
+target-version = "py310"
+line-length = 100
+exclude = ["**/generated/*.pyi"]
 
-lint.ignore = ["E501", "E722", "E731", "E712", "E402", "E741"]
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+# ComfyUI loads optional providers after module initialization. Lambdas form
+# part of the patch interface; explicit equality supports tensor-like objects.
+ignore = ["E402", "E731", "E712", "B007", "B009", "B010"]
 
-exclude = ["*.ipynb", "**/generated/*.pyi"]
+[tool.basedpyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+include = ["."]
+exclude = [".venv", "**/__pycache__"]
+# ComfyUI and optional custom nodes are supplied by the host application.
+reportMissingImports = false
+reportMissingModuleSource = false
 
-[tool.pylint]
-master.py-version = "3.10"
-master.init-hook = "import os, sys; sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), '../..')))"
-master.extension-pkg-allow-list = [
-  "pydantic",
-]
-reports.output-format = "colorized"
-similarities.ignore-imports = "yes"
-messages_control.disable = [
-  "missing-module-docstring",
-  "missing-class-docstring",
-  "missing-function-docstring",
-  "line-too-long",
-  "too-few-public-methods",
-  "too-many-public-methods",
-  "too-many-instance-attributes",
-  "too-many-positional-arguments",
-  "broad-exception-raised",
-  "too-many-lines",
-  "invalid-name",
-  "unused-argument",
-  "broad-exception-caught",
-  "consider-using-with",
-  "fixme",
-  "too-many-statements",
-  "too-many-branches",
-  "too-many-locals",
-  "too-many-arguments",
-  "too-many-return-statements",
-  "too-many-nested-blocks",
-  "duplicate-code",
-  "abstract-method",
-  "superfluous-parens",
-  "arguments-differ",
-  "redefined-builtin",
-  "unnecessary-lambda",
-  "dangerous-default-value",
-  "invalid-overridden-method",
-  # next warnings should be fixed in future
-  "bad-classmethod-argument",  # Class method should have 'cls' as first argument
-  "wrong-import-order",  # Standard imports should be placed before third party imports
-  "ungrouped-imports",
-  "unnecessary-pass",
-  "unnecessary-lambda-assignment",
-  "no-else-return",
-  "unused-variable",
-  "arguments-renamed",
-  "cyclic-import",
-  "global-statement",
-  "import-outside-toplevel",
-  "logging-format-interpolation",
-  "logging-fstring-interpolation",
-  "protected-access",
-  "redefined-outer-name",
-  "reimported",
-  "useless-import-alias",
-  "wrong-import-position",
-]
+stubPath = "typings"
+# ComfyUI accepts any name for its classmethod receiver.
+reportSelfClsParameterName = false
+
+# Match editor diagnostics in CLI/CI so tagged hints cannot silently accumulate.
+reportUnusedVariable = "warning"
+reportUnusedParameter = "warning"
+reportDeprecated = "warning"

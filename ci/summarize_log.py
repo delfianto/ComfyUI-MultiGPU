@@ -4,8 +4,9 @@
 import argparse
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Dict, Any
+from typing import Any
 
 
 def _write_stdout(message: str = "") -> None:
@@ -13,7 +14,7 @@ def _write_stdout(message: str = "") -> None:
     sys.stdout.flush()
 
 
-def load_json_lines(path: Path) -> Iterator[Dict[str, Any]]:
+def load_json_lines(path: Path) -> Iterator[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -27,8 +28,12 @@ def load_json_lines(path: Path) -> Iterator[Dict[str, Any]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Summarize MultiGPU JSON logs into Markdown")
-    parser.add_argument("logfile", type=Path, help="Path to JSONL log produced by MGPU_JSON_LOG_PATH")
-    parser.add_argument("--severity", nargs="*", help="Optional severity levels to include (e.g. INFO WARN ERROR)")
+    parser.add_argument(
+        "logfile", type=Path, help="Path to JSONL log produced by MGPU_JSON_LOG_PATH"
+    )
+    parser.add_argument(
+        "--severity", nargs="*", help="Optional severity levels to include (e.g. INFO WARN ERROR)"
+    )
     parser.add_argument(
         "--component",
         nargs="*",

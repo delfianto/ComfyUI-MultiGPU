@@ -4,8 +4,9 @@
 import argparse
 import json
 import sys
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator, Dict, Any
+from typing import Any
 
 
 def _write_stdout(message: str = "") -> None:
@@ -13,7 +14,7 @@ def _write_stdout(message: str = "") -> None:
     sys.stdout.flush()
 
 
-def load_json_lines(path: Path) -> Iterator[Dict[str, Any]]:
+def load_json_lines(path: Path) -> Iterator[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -25,14 +26,18 @@ def load_json_lines(path: Path) -> Iterator[Dict[str, Any]]:
                 continue
 
 
-def is_allocation_event(entry: Dict[str, Any], keywords: Iterable[str]) -> bool:
+def is_allocation_event(entry: dict[str, Any], keywords: Iterable[str]) -> bool:
     message = entry.get("message", "")
     return any(keyword in message for keyword in keywords)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Extract allocation-related events from MultiGPU JSON logs")
-    parser.add_argument("logfile", type=Path, help="Path to JSONL log produced by MGPU_JSON_LOG_PATH")
+    parser = argparse.ArgumentParser(
+        description="Extract allocation-related events from MultiGPU JSON logs"
+    )
+    parser.add_argument(
+        "logfile", type=Path, help="Path to JSONL log produced by MGPU_JSON_LOG_PATH"
+    )
     parser.add_argument(
         "--keywords",
         nargs="*",

@@ -3,17 +3,17 @@ Model Management Extensions for MultiGPU
 Extends ComfyUI's model management with multi-device capabilities and lifecycle tracking.
 """
 
-import torch
-import logging
 import hashlib
-import psutil
-import comfy.model_management as mm
+import logging
 from datetime import datetime, timezone
+from typing import Any
+
+import comfy.model_management as mm
+import psutil
 import server
+import torch
 
-
-
-logger = logging.getLogger("MultiGPU")
+logger: Any = logging.getLogger("MultiGPU")
 
 
 # ==========================================================================================
@@ -22,6 +22,7 @@ logger = logging.getLogger("MultiGPU")
 
 # DisTorch V1 GGUF stores (backwards compatibility)
 model_allocation_store = {}
+
 
 def create_model_hash(model, caller):
     """Create a unique hash for a GGUF model to track allocations (DisTorch V1)"""
@@ -33,12 +34,14 @@ def create_model_hash(model, caller):
     logger.debug(f"[MultiGPU_DisTorch_HASH] Created hash for {caller}: {final_hash[:8]}...")
     return final_hash
 
+
 # ==========================================================================================
 # Memory Logging Infrastructure
 # ==========================================================================================
 
 _MEM_SNAPSHOT_LAST = {}
 _MEM_SNAPSHOT_SERIES = {}
+
 
 def _capture_memory_snapshot():
     """Capture memory snapshot for CPU and all devices"""
@@ -63,6 +66,7 @@ def _capture_memory_snapshot():
 
     return snapshot
 
+
 def multigpu_memory_log(identifier, tag):
     """Record timestamped memory snapshot with clean aligned logging"""
     if identifier == "print_summary":
@@ -71,11 +75,11 @@ def multigpu_memory_log(identifier, tag):
             logger.mgpu_mm_log(f"=== memory summary: {id_key} ===")
             for ts, tag_name, snap in series:
                 parts = []
-                cpu_used, cpu_total = snap.get("cpu", (0, 0))
-                parts.append(f"cpu|{cpu_used/(1024**3):.2f}")
+                cpu_used, _cpu_total = snap.get("cpu", (0, 0))
+                parts.append(f"cpu|{cpu_used / (1024**3):.2f}")
                 for dev in sorted([k for k in snap.keys() if k != "cpu"]):
-                    used, total = snap[dev]
-                    parts.append(f"{dev}|{used/(1024**3):.2f}")
+                    used, _total = snap[dev]
+                    parts.append(f"{dev}|{used / (1024**3):.2f}")
                 ts_str = ts.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
                 tag_padded = f"{id_key}_{tag_name}".ljust(35)
                 logger.mgpu_mm_log(f"{ts_str} {tag_padded} {' '.join(parts)}")
@@ -95,11 +99,11 @@ def multigpu_memory_log(identifier, tag):
 
     parts = []
     cpu_used, _ = curr.get("cpu", (0, 0))
-    parts.append(f"cpu|{cpu_used/(1024**3):.2f}")
+    parts.append(f"cpu|{cpu_used / (1024**3):.2f}")
 
     for dev in sorted(k for k in curr if k != "cpu"):
         used, _ = curr[dev]
-        parts.append(f"{dev}|{used/(1024**3):.2f}")
+        parts.append(f"{dev}|{used / (1024**3):.2f}")
 
     logger.mgpu_mm_log(f"{ts_str} {tag_padded} {' '.join(parts)}")
 
@@ -125,11 +129,15 @@ def trigger_executor_cache_reset(reason="policy", force=False):
         return
 
     if prompt_server.prompt_queue.currently_running and not force:
-        logger.debug(f"[MultiGPU_Memory_Management] Skipping reset during execution (reason: {reason})")
+        logger.debug(
+            f"[MultiGPU_Memory_Management] Skipping reset during execution (reason: {reason})"
+        )
         return
 
     multigpu_memory_log("executor_reset", f"pre-trigger ({reason})")
-    logger.info(f"[MultiGPU_Memory_Management] Triggering PromptExecutor cache reset. Reason: {reason}")
+    logger.info(
+        f"[MultiGPU_Memory_Management] Triggering PromptExecutor cache reset. Reason: {reason}"
+    )
 
     prompt_server.prompt_queue.set_flag("free_memory", True)
     logger.debug("[MultiGPU_Memory_Management] 'free_memory' flag set")
@@ -138,6 +146,7 @@ def trigger_executor_cache_reset(reason="policy", force=False):
     _last_cpu_usage_at_reset = vm.percent
 
     multigpu_memory_log("executor_reset", f"post-trigger ({reason})")
+
 
 def check_cpu_memory_threshold(threshold_percent=CPU_MEMORY_THRESHOLD_PERCENT):
     """Check CPU memory and trigger reset if threshold exceeded"""
@@ -152,12 +161,17 @@ def check_cpu_memory_threshold(threshold_percent=CPU_MEMORY_THRESHOLD_PERCENT):
 
     if current_usage > threshold_percent:
         if current_usage > (_last_cpu_usage_at_reset + CPU_RESET_HYSTERESIS_PERCENT):
-            logger.warning(f"[MultiGPU_Memory_Monitor] CPU usage ({current_usage:.1f}%) exceeds threshold ({threshold_percent:.1f}%)")
+            logger.warning(
+                f"[MultiGPU_Memory_Monitor] CPU usage ({current_usage:.1f}%) exceeds threshold ({threshold_percent:.1f}%)"
+            )
             multigpu_memory_log("cpu_monitor", f"trigger:{current_usage:.1f}pct")
             trigger_executor_cache_reset(reason="cpu_threshold_exceeded", force=False)
         else:
-            logger.debug(f"[MultiGPU_Memory_Monitor] CPU usage high ({current_usage:.1f}%) but within hysteresis")
+            logger.debug(
+                f"[MultiGPU_Memory_Monitor] CPU usage high ({current_usage:.1f}%) but within hysteresis"
+            )
             multigpu_memory_log("cpu_monitor", f"skip_hysteresis:{current_usage:.1f}pct")
+
 
 def force_full_system_cleanup(reason="manual", force=True):
     """Mirror ComfyUI-Manager 'Free model and node cache' by setting unload_models=True and free_memory=True flags."""
@@ -166,7 +180,9 @@ def force_full_system_cleanup(reason="manual", force=True):
     pre_models = len(mm.current_loaded_models)
 
     multigpu_memory_log("full_cleanup", f"start:{reason}")
-    logger.mgpu_mm_log(f"[ManagerMatch] Requesting cleanup (reason={reason}) | pre_models={pre_models}, cpu_used_gib={pre_cpu/(1024**3):.2f}")
+    logger.mgpu_mm_log(
+        f"[ManagerMatch] Requesting cleanup (reason={reason}) | pre_models={pre_models}, cpu_used_gib={pre_cpu / (1024**3):.2f}"
+    )
 
     if server.PromptServer.instance is not None:
         pq = server.PromptServer.instance.prompt_queue

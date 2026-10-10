@@ -1,11 +1,11 @@
 import logging
+from typing import Any
 
 import comfy.model_management
 import comfy.model_patcher
 from comfy.model_patcher import QuantizedTensor, get_key_weight, low_vram_patch_estimate_vram
 
-
-logger = logging.getLogger("MultiGPU")
+logger: Any = logging.getLogger("MultiGPU")
 
 _PATCH_MARKER = "_mgpu_issue21_clip_dynamic_load_list_guard"
 _MODULE_THRESHOLD = 200
@@ -128,7 +128,9 @@ def register_clip_dynamic_load_list_guard():
             return original(self, for_dynamic=for_dynamic, default_device=default_device)
 
         if _graph_requires_guard(self.model):
-            logger.info("[MultiGPU Issue21] Using non-recursive ModelPatcherDynamic._load_list guard")
+            logger.info(
+                "[MultiGPU Issue21] Using non-recursive ModelPatcherDynamic._load_list guard"
+            )
             return _safe_dynamic_load_list(self, default_device=default_device)
 
         return original(self, for_dynamic=for_dynamic, default_device=default_device)

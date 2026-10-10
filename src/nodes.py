@@ -1,11 +1,13 @@
 import folder_paths
-from pathlib import Path
+
 from nodes import NODE_CLASS_MAPPINGS
+
 from .device_utils import get_device_list
+
 
 class DeviceSelectorMultiGPU:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         devices = get_device_list()
         return {"required": {"device": (devices,)}}
 
@@ -19,9 +21,10 @@ class DeviceSelectorMultiGPU:
         """Return the selected device label without side effects."""
         return (device,)
 
+
 class UnetLoaderGGUF:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         unet_names = list(folder_paths.get_filename_list("unet_gguf"))
         return {
             "required": {
@@ -39,29 +42,38 @@ class UnetLoaderGGUF:
         original_loader = NODE_CLASS_MAPPINGS["UnetLoaderGGUF"]()
         return original_loader.load_unet(unet_name, dequant_dtype, patch_dtype, patch_on_device)
 
+
 class UnetLoaderGGUFAdvanced(UnetLoaderGGUF):
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         unet_names = list(folder_paths.get_filename_list("unet_gguf"))
         return {
             "required": {
                 "unet_name": (unet_names,),
-                "dequant_dtype": (["default", "target", "float32", "float16", "bfloat16"], {"default": "default"}),
-                "patch_dtype": (["default", "target", "float32", "float16", "bfloat16"], {"default": "default"}),
+                "dequant_dtype": (
+                    ["default", "target", "float32", "float16", "bfloat16"],
+                    {"default": "default"},
+                ),
+                "patch_dtype": (
+                    ["default", "target", "float32", "float16", "bfloat16"],
+                    {"default": "default"},
+                ),
                 "patch_on_device": ("BOOLEAN", {"default": False}),
             }
         }
+
     TITLE = "Unet Loader (GGUF/Advanced)"
 
 
 class CLIPLoaderGGUF:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         import nodes
+
         base = nodes.CLIPLoader.INPUT_TYPES()
         return {
             "required": {
-                "clip_name": (s.get_filename_list(),),
+                "clip_name": (node_cls.get_filename_list(),),
                 "type": base["required"]["type"],
             }
         }
@@ -72,7 +84,7 @@ class CLIPLoaderGGUF:
     TITLE = "CLIPLoader (GGUF)"
 
     @classmethod
-    def get_filename_list(s):
+    def get_filename_list(node_cls):
         """Get combined list of CLIP and CLIP_GGUF model files."""
         files = []
         files += folder_paths.get_filename_list("clip")
@@ -91,15 +103,20 @@ class CLIPLoaderGGUF:
 
     def load_clip(self, clip_name, type="stable_diffusion", device=None):
         """Load CLIP model from GGUF or standard format."""
+        # Device selection is handled by the MultiGPU wrapper, preserving the
+        # upstream loader signature for existing workflows.
+        _ = device
         original_loader = NODE_CLASS_MAPPINGS["CLIPLoaderGGUF"]()
         return original_loader.load_clip(clip_name, type)
 
+
 class DualCLIPLoaderGGUF(CLIPLoaderGGUF):
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         import nodes
+
         base = nodes.DualCLIPLoader.INPUT_TYPES()
-        file_options = (s.get_filename_list(), )
+        file_options = (node_cls.get_filename_list(),)
         return {
             "required": {
                 "clip_name1": file_options,
@@ -120,8 +137,8 @@ class DualCLIPLoaderGGUF(CLIPLoaderGGUF):
 
 class TripleCLIPLoaderGGUF(CLIPLoaderGGUF):
     @classmethod
-    def INPUT_TYPES(s):
-        file_options = (s.get_filename_list(), )
+    def INPUT_TYPES(node_cls):
+        file_options = (node_cls.get_filename_list(),)
         return {
             "required": {
                 "clip_name1": file_options,
@@ -137,18 +154,19 @@ class TripleCLIPLoaderGGUF(CLIPLoaderGGUF):
         original_loader = NODE_CLASS_MAPPINGS["TripleCLIPLoaderGGUF"]()
         return original_loader.load_clip(clip_name1, clip_name2, clip_name3, type)
 
+
 class QuadrupleCLIPLoaderGGUF(CLIPLoaderGGUF):
     @classmethod
-    def INPUT_TYPES(s):
-        file_options = (s.get_filename_list(), )
+    def INPUT_TYPES(node_cls):
+        file_options = (node_cls.get_filename_list(),)
         return {
             "required": {
-            "clip_name1": file_options,
-            "clip_name2": file_options,
-            "clip_name3": file_options,
-            "clip_name4": file_options,
+                "clip_name1": file_options,
+                "clip_name2": file_options,
+                "clip_name3": file_options,
+                "clip_name4": file_options,
+            }
         }
-    }
 
     TITLE = "QuadrupleCLIPLoader (GGUF)"
 
@@ -160,12 +178,14 @@ class QuadrupleCLIPLoaderGGUF(CLIPLoaderGGUF):
 
 class LTXVLoader:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {
-                "ckpt_name": (folder_paths.get_filename_list("checkpoints"),
-                            {"tooltip": "The name of the checkpoint (model) to load."}),
-                "dtype": (["bfloat16", "float32"], {"default": "bfloat16"})
+                "ckpt_name": (
+                    folder_paths.get_filename_list("checkpoints"),
+                    {"tooltip": "The name of the checkpoint (model) to load."},
+                ),
+                "dtype": (["bfloat16", "float32"], {"default": "bfloat16"}),
             }
         }
 
@@ -180,115 +200,90 @@ class LTXVLoader:
         """Load LTXV model and VAE with specified precision."""
         original_loader = NODE_CLASS_MAPPINGS["LTXVLoader"]()
         return original_loader.load(ckpt_name, dtype)
-    def _load_unet(self, load_device, offload_device, weights, num_latent_channels, dtype, config=None ):
+
+    def _load_unet(
+        self, load_device, offload_device, weights, num_latent_channels, dtype, config=None
+    ):
         """Load LTXV UNet with device-specific configuration."""
         original_loader = NODE_CLASS_MAPPINGS["LTXVLoader"]()
-        return original_loader._load_unet(load_device, offload_device, weights, num_latent_channels, dtype, config=None )
+        return original_loader._load_unet(
+            load_device, offload_device, weights, num_latent_channels, dtype, config=config
+        )
+
     def _load_vae(self, weights, config=None):
         """Load LTXV VAE from weights."""
         original_loader = NODE_CLASS_MAPPINGS["LTXVLoader"]()
-        return original_loader._load_vae(weights, config=None)
+        return original_loader._load_vae(weights, config=config)
+
 
 class Florence2ModelLoader:
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {
-            "model": ([item.name for item in Path(folder_paths.models_dir, "LLM").iterdir() if item.is_dir()], {"tooltip": "models are expected to be in Comfyui/models/LLM folder"}),
-            "precision": (['fp16','bf16','fp32'],),
-            "attention": (
-                    [ 'flash_attention_2', 'sdpa', 'eager'],
-                    {
-                    "default": 'sdpa'
-                    }),
-            },
-            "optional": {
-                "lora": ("PEFTLORA",),
-                "convert_to_safetensors": ("BOOLEAN", {"default": False, "tooltip": "Some of the older model weights are not saved in .safetensors format, which seem to cause longer loading times, this option converts the .bin weights to .safetensors"}),
-            }
-        }
+    def INPUT_TYPES(node_cls):
+        # Delegate to upstream so the input set tracks Florence2 verbatim
+        # (e.g. post-rewrite removal of `attention` from required) and so
+        # upstream'node_cls `model_paths` class attribute gets populated as a
+        # side-effect — `loadmodel` reads it via `Florence2ModelLoader.model_paths.get(model)`.
+        return NODE_CLASS_MAPPINGS["Florence2ModelLoader"].INPUT_TYPES()
 
     RETURN_TYPES = ("FL2MODEL",)
     RETURN_NAMES = ("florence2_model",)
     FUNCTION = "loadmodel"
     CATEGORY = "Florence2"
 
-    def loadmodel(self, model, precision, attention, lora=None, convert_to_safetensors=False):
-        """Load Florence2 vision model with specified precision and attention mode."""
+    def loadmodel(self, *args, **kwargs):
+        """Forward to the upstream Florence2 loader without re-binding args."""
         original_loader = NODE_CLASS_MAPPINGS["Florence2ModelLoader"]()
-        return original_loader.loadmodel(model, precision, attention, lora, convert_to_safetensors)
+        return original_loader.loadmodel(*args, **kwargs)
+
 
 class DownloadAndLoadFlorence2Model:
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {
-            "model": (
-                    [
-                    'microsoft/Florence-2-base',
-                    'microsoft/Florence-2-base-ft',
-                    'microsoft/Florence-2-large',
-                    'microsoft/Florence-2-large-ft',
-                    'HuggingFaceM4/Florence-2-DocVQA',
-                    'thwri/CogFlorence-2.1-Large',
-                    'thwri/CogFlorence-2.2-Large',
-                    'gokaygokay/Florence-2-SD3-Captioner',
-                    'gokaygokay/Florence-2-Flux-Large',
-                    'MiaoshouAI/Florence-2-base-PromptGen-v1.5',
-                    'MiaoshouAI/Florence-2-large-PromptGen-v1.5',
-                    'MiaoshouAI/Florence-2-base-PromptGen-v2.0',
-                    'MiaoshouAI/Florence-2-large-PromptGen-v2.0',
-                    'PJMixers-Images/Florence-2-base-Castollux-v0.5'
-                    ],
-                    {
-                    "default": 'microsoft/Florence-2-base'
-                    }),
-            "precision": ([ 'fp16','bf16','fp32'],
-                    {
-                    "default": 'fp16'
-                    }),
-            "attention": (
-                    [ 'flash_attention_2', 'sdpa', 'eager'],
-                    {
-                    "default": 'sdpa'
-                    }),
-            },
-            "optional": {
-                "lora": ("PEFTLORA",),
-                "convert_to_safetensors": ("BOOLEAN", {"default": False, "tooltip": "Some of the older model weights are not saved in .safetensors format, which seem to cause longer loading times, this option converts the .bin weights to .safetensors"}),
-            }
-        }
+    def INPUT_TYPES(node_cls):
+        # Delegate to upstream so the model list and signature stay in sync
+        # with kijai/ComfyUI-Florence2 (e.g. PromptGen v2.0 and Castollux
+        # additions, attention parameter relocation).
+        return NODE_CLASS_MAPPINGS["DownloadAndLoadFlorence2Model"].INPUT_TYPES()
 
     RETURN_TYPES = ("FL2MODEL",)
     RETURN_NAMES = ("florence2_model",)
     FUNCTION = "loadmodel"
     CATEGORY = "Florence2"
 
-    def loadmodel(self, model, precision, attention, lora=None, convert_to_safetensors=False):
-        """Download and load Florence2 model from HuggingFace."""
+    def loadmodel(self, *args, **kwargs):
+        """Forward to the upstream HuggingFace downloader/loader."""
         original_loader = NODE_CLASS_MAPPINGS["DownloadAndLoadFlorence2Model"]()
-        return original_loader.loadmodel(model, precision, attention, lora, convert_to_safetensors)
+        return original_loader.loadmodel(*args, **kwargs)
+
 
 class CheckpointLoaderNF4:
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
-                            }}
+    def INPUT_TYPES(node_cls):
+        return {
+            "required": {
+                "ckpt_name": (folder_paths.get_filename_list("checkpoints"),),
+            }
+        }
+
     RETURN_TYPES = ("MODEL", "CLIP", "VAE")
     FUNCTION = "load_checkpoint"
 
     CATEGORY = "loaders"
-
 
     def load_checkpoint(self, ckpt_name):
         """Load checkpoint in NF4 quantized format."""
         original_loader = NODE_CLASS_MAPPINGS["CheckpointLoaderNF4"]()
         return original_loader.load_checkpoint(ckpt_name)
 
+
 class LoadFluxControlNet:
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {"model_name": (["flux-dev", "flux-dev-fp8", "flux-schnell"],),
-                            "controlnet_path": (folder_paths.get_filename_list("xlabs_controlnets"), ),
-                            }}
+    def INPUT_TYPES(node_cls):
+        return {
+            "required": {
+                "model_name": (["flux-dev", "flux-dev-fp8", "flux-schnell"],),
+                "controlnet_path": (folder_paths.get_filename_list("xlabs_controlnets"),),
+            }
+        }
 
     RETURN_TYPES = ("FluxControlNet",)
     RETURN_NAMES = ("ControlNet",)
@@ -300,19 +295,24 @@ class LoadFluxControlNet:
         original_loader = NODE_CLASS_MAPPINGS["LoadFluxControlNet"]()
         return original_loader.loadmodel(model_name, controlnet_path)
 
+
 class MMAudioModelLoader:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {
-                "mmaudio_model": (folder_paths.get_filename_list("mmaudio"), {"tooltip": "These models are loaded from the 'ComfyUI/models/mmaudio' -folder",}),
-
-            "base_precision": (["fp16", "fp32", "bf16"], {"default": "fp16"}),
+                "mmaudio_model": (
+                    folder_paths.get_filename_list("mmaudio"),
+                    {
+                        "tooltip": "These models are loaded from the 'ComfyUI/models/mmaudio' -folder",
+                    },
+                ),
+                "base_precision": (["fp16", "fp32", "bf16"], {"default": "fp16"}),
             },
         }
 
     RETURN_TYPES = ("MMAUDIO_MODEL",)
-    RETURN_NAMES = ("mmaudio_model", )
+    RETURN_NAMES = ("mmaudio_model",)
     FUNCTION = "loadmodel"
     CATEGORY = "MMAudio"
 
@@ -321,49 +321,83 @@ class MMAudioModelLoader:
         original_loader = NODE_CLASS_MAPPINGS["MMAudioModelLoader"]()
         return original_loader.loadmodel(mmaudio_model, base_precision)
 
+
 class MMAudioFeatureUtilsLoader:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {
-                "vae_model": (folder_paths.get_filename_list("mmaudio"), {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"}),
-                "synchformer_model": (folder_paths.get_filename_list("mmaudio"), {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"}),
-                "clip_model": (folder_paths.get_filename_list("mmaudio"), {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"}),
+                "vae_model": (
+                    folder_paths.get_filename_list("mmaudio"),
+                    {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"},
+                ),
+                "synchformer_model": (
+                    folder_paths.get_filename_list("mmaudio"),
+                    {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"},
+                ),
+                "clip_model": (
+                    folder_paths.get_filename_list("mmaudio"),
+                    {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"},
+                ),
             },
             "optional": {
-            "bigvgan_vocoder_model": ("VOCODER_MODEL", {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"}),
-                "mode": (["16k", "44k"], {"default": "44k"}),
-                "precision": (["fp16", "fp32", "bf16"],
-                    {"default": "fp16"}
+                "bigvgan_vocoder_model": (
+                    "VOCODER_MODEL",
+                    {"tooltip": "These models are loaded from 'ComfyUI/models/mmaudio'"},
                 ),
-            }
+                "mode": (["16k", "44k"], {"default": "44k"}),
+                "precision": (["fp16", "fp32", "bf16"], {"default": "fp16"}),
+            },
         }
 
     RETURN_TYPES = ("MMAUDIO_FEATUREUTILS",)
-    RETURN_NAMES = ("mmaudio_featureutils", )
+    RETURN_NAMES = ("mmaudio_featureutils",)
     FUNCTION = "loadmodel"
     CATEGORY = "MMAudio"
 
-    def loadmodel(self, vae_model, precision, synchformer_model, clip_model, mode, bigvgan_vocoder_model=None):
+    def loadmodel(
+        self, vae_model, precision, synchformer_model, clip_model, mode, bigvgan_vocoder_model=None
+    ):
         """Load MMAudio feature extraction utilities including VAE, Synchformer, and CLIP."""
         original_loader = NODE_CLASS_MAPPINGS["MMAudioFeatureUtilsLoader"]()
-        return original_loader.loadmodel(vae_model, precision, synchformer_model, clip_model, mode, bigvgan_vocoder_model)
+        return original_loader.loadmodel(
+            vae_model, precision, synchformer_model, clip_model, mode, bigvgan_vocoder_model
+        )
+
 
 class MMAudioSampler:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {
                 "mmaudio_model": ("MMAUDIO_MODEL",),
                 "feature_utils": ("MMAUDIO_FEATUREUTILS",),
-                "duration": ("FLOAT", {"default": 8, "step": 0.01, "tooltip": "Duration of the audio in seconds"}),
-                "steps": ("INT", {"default": 25, "step": 1, "tooltip": "Number of steps to interpolate"}),
-                "cfg": ("FLOAT", {"default": 4.5, "step": 0.1, "tooltip": "Strength of the conditioning"}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "prompt": ("STRING", {"default": "", "multiline": True} ),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True} ),
-                "mask_away_clip": ("BOOLEAN", {"default": False, "tooltip": "If true, the clip video will be masked away"}),
-                "force_offload": ("BOOLEAN", {"default": True, "tooltip": "If true, the model will be offloaded to the offload device"}),
+                "duration": (
+                    "FLOAT",
+                    {"default": 8, "step": 0.01, "tooltip": "Duration of the audio in seconds"},
+                ),
+                "steps": (
+                    "INT",
+                    {"default": 25, "step": 1, "tooltip": "Number of steps to interpolate"},
+                ),
+                "cfg": (
+                    "FLOAT",
+                    {"default": 4.5, "step": 0.1, "tooltip": "Strength of the conditioning"},
+                ),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "prompt": ("STRING", {"default": "", "multiline": True}),
+                "negative_prompt": ("STRING", {"default": "", "multiline": True}),
+                "mask_away_clip": (
+                    "BOOLEAN",
+                    {"default": False, "tooltip": "If true, the clip video will be masked away"},
+                ),
+                "force_offload": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "If true, the model will be offloaded to the offload device",
+                    },
+                ),
             },
             "optional": {
                 "images": ("IMAGE",),
@@ -371,19 +405,45 @@ class MMAudioSampler:
         }
 
     RETURN_TYPES = ("AUDIO",)
-    RETURN_NAMES = ("audio", )
+    RETURN_NAMES = ("audio",)
     FUNCTION = "sample"
     CATEGORY = "MMAudio"
 
-    def sample(self, mmaudio_model, seed, feature_utils, duration, steps, cfg, prompt, negative_prompt, mask_away_clip, force_offload, images=None):
+    def sample(
+        self,
+        mmaudio_model,
+        seed,
+        feature_utils,
+        duration,
+        steps,
+        cfg,
+        prompt,
+        negative_prompt,
+        mask_away_clip,
+        force_offload,
+        images=None,
+    ):
         """Sample audio from MMAudio model with conditioning."""
         original_loader = NODE_CLASS_MAPPINGS["MMAudioSampler"]()
-        return original_loader.sample(mmaudio_model, seed, feature_utils, duration, steps, cfg, prompt, negative_prompt, mask_away_clip, force_offload, images)
+        return original_loader.sample(
+            mmaudio_model,
+            seed,
+            feature_utils,
+            duration,
+            steps,
+            cfg,
+            prompt,
+            negative_prompt,
+            mask_away_clip,
+            force_offload,
+            images,
+        )
+
 
 class PulidModelLoader:
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "pulid_file": (folder_paths.get_filename_list("pulid"), )}}
+    def INPUT_TYPES(node_cls):
+        return {"required": {"pulid_file": (folder_paths.get_filename_list("pulid"),)}}
 
     RETURN_TYPES = ("PULID",)
     FUNCTION = "load_model"
@@ -394,12 +454,13 @@ class PulidModelLoader:
         original_loader = NODE_CLASS_MAPPINGS["PulidModelLoader"]()
         return original_loader.load_model(pulid_file)
 
+
 class PulidInsightFaceLoader:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {
-                "provider": (["CPU", "CUDA", "ROCM", "CoreML"], ),
+                "provider": (["CPU", "CUDA", "ROCM", "CoreML"],),
             },
         }
 
@@ -412,9 +473,10 @@ class PulidInsightFaceLoader:
         original_loader = NODE_CLASS_MAPPINGS["PulidInsightFaceLoader"]()
         return original_loader.load_insightface(provider)
 
+
 class PulidEvaClipLoader:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(node_cls):
         return {
             "required": {},
         }
@@ -428,12 +490,18 @@ class PulidEvaClipLoader:
         original_loader = NODE_CLASS_MAPPINGS["PulidEvaClipLoader"]()
         return original_loader.load_eva_clip()
 
+
 class UNetLoaderLP:
     """UNet Loader (Low Precision) - sets LoRA precision to False for CPU storage optimization"""
+
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "unet_name": (folder_paths.get_filename_list("unet"), ),
-                             }}
+    def INPUT_TYPES(node_cls):
+        return {
+            "required": {
+                "unet_name": (folder_paths.get_filename_list("unet"),),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "load_unet"
     CATEGORY = "loaders"
@@ -445,7 +513,7 @@ class UNetLoaderLP:
         out = original_loader.load_unet(unet_name, "default")
 
         # Set the low-precision LoRA flag on the loaded model
-        if hasattr(out[0], 'model'):
+        if hasattr(out[0], "model"):
             out[0].model._distorch_high_precision_loras = False
         else:
             patcher = getattr(out[0], "patcher", None)

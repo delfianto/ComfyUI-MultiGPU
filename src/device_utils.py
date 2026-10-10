@@ -1,13 +1,16 @@
-import torch
-import logging
-import psutil
-import comfy.model_management as mm
 import gc
 import importlib
+import logging
+from typing import Any
 
-logger = logging.getLogger("MultiGPU")
+import comfy.model_management as mm
+import psutil
+import torch
+
+logger: Any = logging.getLogger("MultiGPU")
 
 _DEVICE_LIST_CACHE = None
+
 
 def get_device_list():
     """
@@ -51,8 +54,12 @@ def get_device_list():
 
     try:
         importlib.import_module("torch_npu")
-        if hasattr(torch, "npu") and hasattr(torch.npu, "is_available") and torch.npu.is_available():
-            device_count = torch.npu.device_count()
+        if (
+            hasattr(torch, "npu")
+            and hasattr(getattr(torch, "npu"), "is_available")
+            and getattr(torch, "npu").is_available()
+        ):
+            device_count = getattr(torch, "npu").device_count()
             devs += [f"npu:{i}" for i in range(device_count)]
             logger.debug(f"[MultiGPU_Device_Utils] Found {device_count} NPU device(s)")
     except ImportError:
@@ -60,8 +67,12 @@ def get_device_list():
 
     try:
         importlib.import_module("torch_mlu")
-        if hasattr(torch, "mlu") and hasattr(torch.mlu, "is_available") and torch.mlu.is_available():
-            device_count = torch.mlu.device_count()
+        if (
+            hasattr(torch, "mlu")
+            and hasattr(getattr(torch, "mlu"), "is_available")
+            and getattr(torch, "mlu").is_available()
+        ):
+            device_count = getattr(torch, "mlu").device_count()
             devs += [f"mlu:{i}" for i in range(device_count)]
             logger.debug(f"[MultiGPU_Device_Utils] Found {device_count} MLU device(s)")
     except ImportError:
@@ -73,6 +84,7 @@ def get_device_list():
 
     try:
         import torch_directml
+
         adapter_count = torch_directml.device_count()
         if adapter_count > 0:
             devs += [f"directml:{i}" for i in range(adapter_count)]
@@ -82,8 +94,8 @@ def get_device_list():
 
     try:
         if hasattr(torch, "corex"):
-            if hasattr(torch.corex, "device_count"):
-                device_count = torch.corex.device_count()
+            if hasattr(getattr(torch, "corex"), "device_count"):
+                device_count = getattr(torch, "corex").device_count()
                 devs += [f"corex:{i}" for i in range(device_count)]
                 logger.debug(f"[MultiGPU_Device_Utils] Found {device_count} CoreX device(s)")
             else:
@@ -98,6 +110,7 @@ def get_device_list():
 
     return devs
 
+
 def is_accelerator_available():
     """Check if any GPU or accelerator device is available including CUDA, XPU, NPU, MLU, MPS, DirectML, or CoreX."""
     if hasattr(torch, "cuda") and torch.cuda.is_available():
@@ -108,14 +121,22 @@ def is_accelerator_available():
 
     try:
         importlib.import_module("torch_npu")
-        if hasattr(torch, "npu") and hasattr(torch.npu, "is_available") and torch.npu.is_available():
+        if (
+            hasattr(torch, "npu")
+            and hasattr(getattr(torch, "npu"), "is_available")
+            and getattr(torch, "npu").is_available()
+        ):
             return True
     except ImportError:
         pass
 
     try:
         importlib.import_module("torch_mlu")
-        if hasattr(torch, "mlu") and hasattr(torch.mlu, "is_available") and torch.mlu.is_available():
+        if (
+            hasattr(torch, "mlu")
+            and hasattr(getattr(torch, "mlu"), "is_available")
+            and getattr(torch, "mlu").is_available()
+        ):
             return True
     except ImportError:
         pass
@@ -125,6 +146,7 @@ def is_accelerator_available():
 
     try:
         import torch_directml
+
         if torch_directml.device_count() > 0:
             return True
     except ImportError:
@@ -135,10 +157,12 @@ def is_accelerator_available():
 
     return False
 
+
 def is_device_compatible(device_string):
     """Check if a device string represents a valid available device."""
     available_devices = get_device_list()
     return device_string in available_devices
+
 
 def get_device_type(device_string):
     """Extract device type from device string (e.g. 'cuda' from 'cuda:0')."""
@@ -146,12 +170,14 @@ def get_device_type(device_string):
         return device_string.split(":")[0]
     return device_string
 
+
 def parse_device_string(device_string):
     """Parse device string into (device_type, device_index) tuple."""
     if ":" in device_string:
         parts = device_string.split(":")
         return parts[0], int(parts[1])
     return device_string, None
+
 
 def soft_empty_cache_multigpu():
     """Clear allocator caches across all devices using context managers to preserve calling thread device context."""
@@ -166,7 +192,9 @@ def soft_empty_cache_multigpu():
     logger.mgpu_mm_log(f"soft_empty_cache_multigpu: devices to clear = {all_devices}")
 
     # Check global availability first to avoid unnecessary iteration if backend is missing
-    is_cuda_available = hasattr(torch, "cuda") and hasattr(torch.cuda, "is_available") and torch.cuda.is_available()
+    is_cuda_available = (
+        hasattr(torch, "cuda") and hasattr(torch.cuda, "is_available") and torch.cuda.is_available()
+    )
 
     for device_str in all_devices:
         if device_str.startswith("cuda:"):
@@ -199,26 +227,26 @@ def soft_empty_cache_multigpu():
                 multigpu_memory_log("general", f"post-empty:{device_str}")
 
         elif device_str.startswith("npu:"):
-            if hasattr(torch, "npu") and hasattr(torch.npu, "empty_cache"):
+            if hasattr(torch, "npu") and hasattr(getattr(torch, "npu"), "empty_cache"):
                 logger.mgpu_mm_log(f"Clearing NPU cache on {device_str}")
                 multigpu_memory_log("general", f"pre-empty:{device_str}")
-                torch.npu.empty_cache()
+                getattr(torch, "npu").empty_cache()
                 logger.mgpu_mm_log(f"Cleared NPU cache on {device_str}")
                 multigpu_memory_log("general", f"post-empty:{device_str}")
 
         elif device_str.startswith("mlu:"):
-            if hasattr(torch, "mlu") and hasattr(torch.mlu, "empty_cache"):
+            if hasattr(torch, "mlu") and hasattr(getattr(torch, "mlu"), "empty_cache"):
                 logger.mgpu_mm_log(f"Clearing MLU cache on {device_str}")
                 multigpu_memory_log("general", f"pre-empty:{device_str}")
-                torch.mlu.empty_cache()
+                getattr(torch, "mlu").empty_cache()
                 logger.mgpu_mm_log(f"Cleared MLU cache on {device_str}")
                 multigpu_memory_log("general", f"post-empty:{device_str}")
 
         elif device_str.startswith("corex:"):
-            if hasattr(torch, "corex") and hasattr(torch.corex, "empty_cache"):
+            if hasattr(torch, "corex") and hasattr(getattr(torch, "corex"), "empty_cache"):
                 logger.mgpu_mm_log(f"Clearing CoreX cache on {device_str}")
                 multigpu_memory_log("general", f"pre-empty:{device_str}")
-                torch.corex.empty_cache()
+                getattr(torch, "corex").empty_cache()
                 logger.mgpu_mm_log(f"Cleared CoreX cache on {device_str}")
                 multigpu_memory_log("general", f"post-empty:{device_str}")
 
@@ -229,9 +257,12 @@ def soft_empty_cache_multigpu():
 # Comprehensive Memory Management (VRAM + CPU + Store Pruning)
 # ==========================================================================================
 
-logger.info("[MultiGPU Core Patching] Patching mm.soft_empty_cache for Comprehensive Memory Management (VRAM + CPU + Store Pruning)")
+logger.info(
+    "[MultiGPU Core Patching] Patching mm.soft_empty_cache for Comprehensive Memory Management (VRAM + CPU + Store Pruning)"
+)
 
 original_soft_empty_cache = mm.soft_empty_cache
+
 
 def soft_empty_cache_distorch2_patched(force=False):
     """Patched mm.soft_empty_cache managing VRAM across all devices, CPU RAM with adaptive thresholding, and DisTorch store pruning."""
@@ -239,12 +270,12 @@ def soft_empty_cache_distorch2_patched(force=False):
 
     is_distorch_active = False
 
-    for i, lm in enumerate(mm.current_loaded_models):
+    for _i, lm in enumerate(mm.current_loaded_models):
         mp = lm.model
         if mp is not None:
             inner_model = mp.model
 
-            if hasattr(inner_model, '_distorch_v2_meta'):
+            if hasattr(inner_model, "_distorch_v2_meta"):
                 is_distorch_active = True
                 break
 
@@ -264,18 +295,20 @@ def soft_empty_cache_distorch2_patched(force=False):
         logger.mgpu_mm_log("Force flag active: triggering executor cache reset (CPU)")
         trigger_executor_cache_reset(reason="forced_soft_empty", force=True)
 
+
 mm.soft_empty_cache = soft_empty_cache_distorch2_patched
 
 # ==========================================================================================
 # Memory Inspection Utilities
 # ==========================================================================================
 
+
 def comfyui_memory_load(tag):
     """Return single-line pipe-delimited snapshot of system and device memory usage in GiB."""
     # CPU RAM
     vm = psutil.virtual_memory()
-    cpu_used_gib = vm.used / (1024.0 ** 3)
-    cpu_total_gib = vm.total / (1024.0 ** 3)
+    cpu_used_gib = vm.used / (1024.0**3)
+    cpu_total_gib = vm.total / (1024.0**3)
 
     segments = [f"tag={tag}", f"cpu={cpu_used_gib:.2f}/{cpu_total_gib:.2f}"]
 
@@ -294,8 +327,8 @@ def comfyui_memory_load(tag):
             system_free = free_info
         used = max(0, (total or 0) - (system_free or 0))
 
-        used_gib = used / (1024.0 ** 3)
-        total_gib = (total or 0) / (1024.0 ** 3)
+        used_gib = used / (1024.0**3)
+        total_gib = (total or 0) / (1024.0**3)
         if total_gib > 0:
             segments.append(f"{dev_str}={used_gib:.2f}/{total_gib:.2f}")
 
