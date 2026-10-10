@@ -37,7 +37,6 @@ from .model_management_mgpu import (
     trigger_executor_cache_reset as trigger_executor_cache_reset,
 )
 
-WEB_DIRECTORY = "./web"
 MGPU_MM_LOG = False
 DEBUG_LOG = False
 

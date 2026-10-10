@@ -3,7 +3,8 @@
 from . import src as _implementation
 
 NODE_CLASS_MAPPINGS = _implementation.NODE_CLASS_MAPPINGS
-WEB_DIRECTORY = "./web"
+# ComfyUI node help is served at /extensions/<package>/docs/<node>.md.
+WEB_DIRECTORY = "."
 
 __all__ = ["NODE_CLASS_MAPPINGS", "WEB_DIRECTORY"]
 

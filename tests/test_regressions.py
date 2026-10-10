@@ -45,8 +45,8 @@ class EntryPointTests(unittest.TestCase):
             spec.loader.exec_module(module)
         self.assertIs(module.NODE_CLASS_MAPPINGS, implementation.NODE_CLASS_MAPPINGS)
         self.assertEqual(module.get_current_device(), "cuda:1")
-        self.assertEqual(module.WEB_DIRECTORY, "./web")
-        self.assertTrue((ROOT / module.WEB_DIRECTORY).is_dir())
+        self.assertEqual(module.WEB_DIRECTORY, ".")
+        self.assertTrue((ROOT / module.WEB_DIRECTORY / "docs/CLIPLoaderMultiGPU.md").is_file())
 
     def test_prestartup_executes_only_independent_initializer(self):
         spec = importlib.util.spec_from_file_location(

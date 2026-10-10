@@ -98,8 +98,10 @@ installs the compatibility patches. Tests remain in `tests/`, CI utilities in
 Two small entry files remain at the repository root because ComfyUI discovers
 them there:
 
-- `__init__.py` exposes the node mappings, keeps `WEB_DIRECTORY` pointing to the
-  root `web/` directory, and forwards historical helper attributes to `src`.
+- `__init__.py` exposes the node mappings and forwards historical helper
+  attributes to `src`. Its `WEB_DIRECTORY` points to the repository root so
+  ComfyUI can still fetch `docs/<node>.md` for in-app node help. All Markdown
+  documentation now lives in `docs/`; the former `web/` directory is removed.
 - `prestartup_script.py` executes `src/prestartup_script.py` directly. It avoids
   importing the runtime package or Torch before core configures CUDA visibility.
 
