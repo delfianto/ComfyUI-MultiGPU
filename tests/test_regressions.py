@@ -1,6 +1,7 @@
 """CPU regressions; import individual modules without starting ComfyUI."""
 
 import importlib.util
+import os
 import sys
 import unittest
 from contextlib import contextmanager
@@ -112,11 +113,15 @@ class PeerTests(unittest.TestCase):
             loader.assert_called_once_with("libcudart.so.13")
 
     def test_windows_runtime_candidates(self):
+        host_platform = os.name
+        windows = SimpleNamespace(name="nt", path=os.path)
         with (
-            patch.object(self.module.os, "name", "nt"),
+            patch.object(self.module, "os", windows),
+            patch.object(self.module.ctypes.util, "find_library", return_value=None),
             patch.object(self.module.glob, "glob", return_value=["torch/lib/cudart64_13.dll"]),
         ):
             self.assertEqual(self.module._cudart_candidates()[0], "torch/lib/cudart64_13.dll")
+            self.assertEqual(os.name, host_platform)
 
 
 class MemoryTests(unittest.TestCase):

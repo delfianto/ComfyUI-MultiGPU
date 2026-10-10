@@ -10,7 +10,7 @@ jobs:
           python-version: '3.12'
       - name: Install development tools and CPU test dependencies
         run: |
-          python -m pip install 'ruff>=0.17,<0.18' 'basedpyright>=1.39,<2' packaging
+          python -m pip install 'ruff>=0.17,<0.18' 'basedpyright>=1.39,<2' packaging numpy
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
       - run: ruff check .
       - run: ruff format --check .
