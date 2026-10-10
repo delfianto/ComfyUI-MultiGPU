@@ -704,13 +704,12 @@ def override_class_clip(cls):
 
         def override(self, *args, device=None, **kwargs):
             original_text_device = get_current_text_encoder_device()
-            if device is not None:
-                set_current_text_encoder_device(device)
-            kwargs["device"] = "default"
-            fn = getattr(super(), cls.FUNCTION)
-            out = fn(*args, **kwargs)
             try:
-                return out
+                if device is not None:
+                    set_current_text_encoder_device(device)
+                kwargs["device"] = "default"
+                fn = getattr(super(), cls.FUNCTION)
+                return fn(*args, **kwargs)
             finally:
                 set_current_text_encoder_device(original_text_device)
 
@@ -736,12 +735,11 @@ def override_class_clip_no_device(cls):
 
         def override(self, *args, device=None, **kwargs):
             original_text_device = get_current_text_encoder_device()
-            if device is not None:
-                set_current_text_encoder_device(device)
-            fn = getattr(super(), cls.FUNCTION)
-            out = fn(*args, **kwargs)
             try:
-                return out
+                if device is not None:
+                    set_current_text_encoder_device(device)
+                fn = getattr(super(), cls.FUNCTION)
+                return fn(*args, **kwargs)
             finally:
                 set_current_text_encoder_device(original_text_device)
 

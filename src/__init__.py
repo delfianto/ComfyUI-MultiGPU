@@ -247,7 +247,7 @@ def get_current_unet_offload_device():
     return current_unet_offload_device
 
 
-def _coerce_torch_device(device):
+def _coerce_torch_device(device: Any) -> torch.device | None:
     """Best-effort conversion to torch.device for guard and patch helpers."""
     if device is None:
         return None

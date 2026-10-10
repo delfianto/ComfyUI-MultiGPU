@@ -28,8 +28,12 @@ def _cudart_candidates():
     names = []
     if os.name == "nt":
         try:
-            libdir = os.path.join(os.path.dirname(torch.__file__), "lib")
-            names.extend(sorted(glob.glob(os.path.join(libdir, "cudart64_*.dll")), reverse=True))
+            torch_file = torch.__file__
+            if torch_file is not None:
+                libdir = os.path.join(os.path.dirname(torch_file), "lib")
+                names.extend(
+                    sorted(glob.glob(os.path.join(libdir, "cudart64_*.dll")), reverse=True)
+                )
         except Exception:
             pass
         names.extend(["cudart64_13.dll", "cudart64_12.dll", "cudart64_110.dll", "cudart64_101.dll"])

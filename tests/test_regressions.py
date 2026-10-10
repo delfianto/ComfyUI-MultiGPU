@@ -123,6 +123,17 @@ class PeerTests(unittest.TestCase):
             self.assertEqual(self.module._cudart_candidates()[0], "torch/lib/cudart64_13.dll")
             self.assertEqual(os.name, host_platform)
 
+    def test_missing_torch_file_keeps_runtime_fallbacks(self):
+        windows = SimpleNamespace(name="nt", path=os.path)
+        with (
+            patch.object(self.module, "os", windows),
+            patch.object(torch, "__file__", None),
+            patch.object(self.module.ctypes.util, "find_library", return_value=None),
+            patch.object(self.module.glob, "glob") as search,
+        ):
+            self.assertEqual(self.module._cudart_candidates()[0], "cudart64_13.dll")
+            search.assert_not_called()
+
 
 class MemoryTests(unittest.TestCase):
     def test_weight_norm_storage(self):
@@ -214,6 +225,20 @@ class ClipTests(unittest.TestCase):
             self.clip_type().encode_from_tokens_scheduled("error")
         self.assertEqual(self.device, "cuda:0")
 
+    def test_alternating_encoders_do_not_capture_another_patchers_device(self):
+        self.module.install_clip_runtime_device_guard(self.guard)
+        first, second = self.clip_type(), self.clip_type()
+        first.patcher.load_device = "cuda:0"
+        second.patcher.load_device = "cuda:1"
+        for _ in range(4):
+            self.assertEqual(first.encode_from_tokens_scheduled("ok"), "cuda:0")
+            self.assertEqual(second.encode_from_tokens_scheduled("ok"), "cuda:1")
+            self.assertEqual(self.device, "cuda:0")
+        # An offload/reassignment must be observed at the next encode call.
+        second.patcher.load_device = "cpu"
+        self.assertEqual(second.encode_from_tokens_scheduled("ok"), "cpu")
+        self.assertEqual(self.device, "cuda:0")
+
     def test_vae_standard_tiled_and_exception_restoration(self):
         self.module.install_vae_runtime_device_guard(self.guard)
         vae = self.vae_type()
@@ -226,6 +251,61 @@ class ClipTests(unittest.TestCase):
 
 
 class CompatibilityTests(unittest.TestCase):
+    @staticmethod
+    def model(allocation=None, patches=()):
+        inner = SimpleNamespace()
+        if allocation is not None:
+            inner._distorch_v2_meta = {"full_allocation": allocation}
+        return SimpleNamespace(model=inner, model_patches_models=lambda: patches)
+
+    def test_standard_and_empty_allocation_requests_preserve_core_contract(self):
+        module = load_module("compatibility")
+        core, distributed = Mock(return_value="core"), Mock()
+        loader = module.preserve_core_model_loading(core, distributed)
+        models = [self.model(), self.model("")]
+        self.assertEqual(
+            loader(iter(models), 123, force_full_load=True, future_option="preserved"), "core"
+        )
+        core.assert_called_once_with(models, 123, force_full_load=True, future_option="preserved")
+        distributed.assert_not_called()
+
+    def test_explicit_allocations_still_use_distributed_loader(self):
+        module = load_module("compatibility")
+        core, distributed = Mock(), Mock(return_value="distributed")
+        loader = module.preserve_core_model_loading(core, distributed)
+        models = [self.model(), self.model("#cuda:1;4;cpu")]
+        self.assertEqual(loader(models, memory_required=123), "distributed")
+        distributed.assert_called_once_with(models, memory_required=123)
+        core.assert_not_called()
+
+    def test_annotated_attached_model_uses_distributed_loader(self):
+        module = load_module("compatibility")
+        core, distributed = Mock(), Mock()
+        loader = module.preserve_core_model_loading(core, distributed)
+        models = [self.model(patches=[self.model("#cuda:1;4;cpu")])]
+        loader(models)
+        distributed.assert_called_once_with(models)
+        core.assert_not_called()
+
+    def test_legacy_provider_keeps_existing_fallback(self):
+        module = load_module("compatibility")
+        core, distributed = Mock(), Mock()
+        models = [SimpleNamespace(model=SimpleNamespace())]
+        module.preserve_core_model_loading(core, distributed)(models)
+        distributed.assert_called_once_with(models)
+        core.assert_not_called()
+
+    def test_shared_patch_cycles_preserve_core_and_propagate_errors(self):
+        module = load_module("compatibility")
+        model = self.model()
+        model.model_patches_models = lambda: [model]
+        core = Mock(side_effect=ValueError("core failure"))
+        distributed = Mock()
+        with self.assertRaisesRegex(ValueError, "core failure"):
+            module.preserve_core_model_loading(core, distributed)([model])
+        core.assert_called_once_with([model])
+        distributed.assert_not_called()
+
     def test_native_kitchen_versions_are_not_patched(self):
         module = load_module("compatibility")
         self.assertTrue(module.needs_legacy_dlpack_guard("0.2.34"))
@@ -293,6 +373,35 @@ class LoaderTests(unittest.TestCase):
         ):
             self.nodes = load_module("nodes")
             self.wrappers = load_module("wrappers")
+
+    def test_standard_clip_loaders_restore_selection_after_failure(self):
+        state = SimpleNamespace(device="cuda:0")
+
+        def load(self, **kwargs):
+            self.kwargs = kwargs
+            self.selected = state.device
+            raise ValueError("provider load failure")
+
+        provider = type("Provider", (), {"FUNCTION": "load", "load": load})
+        package = SimpleNamespace(
+            get_current_text_encoder_device=lambda: state.device,
+            set_current_text_encoder_device=lambda device: setattr(state, "device", device),
+        )
+        for factory, workaround in [
+            (self.wrappers.override_class_clip, True),
+            (self.wrappers.override_class_clip_no_device, False),
+        ]:
+            with self.subTest(workaround=workaround):
+                with patch.dict(sys.modules, {"mgpu_regression": package}):
+                    node = factory(provider)()
+                with self.assertRaisesRegex(ValueError, "provider load failure"):
+                    node.override(device="cuda:1", future_option=True)
+                self.assertEqual(node.selected, "cuda:1")
+                self.assertEqual(state.device, "cuda:0")
+                expected: dict[str, Any] = {"future_option": True}
+                if workaround:
+                    expected["device"] = "default"
+                self.assertEqual(node.kwargs, expected)
 
     def test_florence_tracks_schema_and_keyword_arguments(self):
         for name in ("Florence2ModelLoader", "DownloadAndLoadFlorence2Model"):

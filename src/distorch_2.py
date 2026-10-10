@@ -14,6 +14,7 @@ logger: Any = logging.getLogger("MultiGPU")
 import comfy.model_management as mm
 import comfy.model_patcher
 
+from .compatibility import preserve_core_model_loading
 from .device_utils import get_device_list
 from .memory_utils import model_parameter_bytes
 from .model_management_mgpu import multigpu_memory_log
@@ -259,7 +260,9 @@ def register_patched_safetensor_modelpatcher():
                 current_loaded_models.insert(0, loaded_model)
 
         # Replace the module function
-        mm.load_models_gpu = patched_load_models_gpu
+        mm.load_models_gpu = preserve_core_model_loading(
+            mm.load_models_gpu, patched_load_models_gpu
+        )
 
         original_partially_load = comfy.model_patcher.ModelPatcher.partially_load
 

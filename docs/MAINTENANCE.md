@@ -98,7 +98,7 @@ and remaining work together.
 | Critical | [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212) | open | A GPU reportedly disappears during MiniMax H3 generation on four RTX 3090s; cause is uncertain. | No targeted fix established. Cross-device fixes may be related, but current evidence cannot establish causation or resolution. | Obtain a reproducible graph, driver/Xid logs, and comparisons with core device-selection nodes on the affected hardware. |
 | High | Local code finding: older GGUF wrappers | open | Provider calls occur before device-restoration try/finally; failures can leave global device state changed. | No fix yet. This is a confirmed code finding, not an established cause of a specific upstream report. | Protect the entire operation in src/wrappers.py; test restoration after provider and result-processing failures. **Next implementation item.** |
 | High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | open | Async/await errors prevent generation; wrappers assume synchronous results. | No fix yet; the report lacks a precise reproducer, so its cause remains unconfirmed. | Identify the affected provider/version; preserve its execution contract and device guards through completion, failure, and cancellation. Test synchronous and async providers. |
-| High | [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) | partial | Switching encoders on GPU 1 reportedly produces garbled output after two or three runs, particularly Flux.2 Klein FP8. | Runtime device guards address related symptoms; this repeated-run scenario is untested. | Test FP8/GGUF encoder switching, eviction, and reloads; compare conditioning consistency and device state. |
+| High | [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) | fixed | Switching encoders on GPU 1 reportedly produces garbled output after two or three runs, particularly Flux.2 Klein FP8. | Preserve core loading for ordinary/empty-allocation requests after DisTorch installs its patches; restore CLIP loader device selection on failures. Repeated encoder and two-stage generation tests pass with mixed-FP8 Qwen3-8B: conditioning and output pixels match exactly across runs and loader modes. See [validation](#repeated-clip-validation-2026-10-10). | - |
 | High | [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209) | partial | MiniMax H3 mixed INT8/INT4 allocation is accepted while donor VRAM reportedly stays nearly empty. | DynamicVRAM bypass and physical-storage accounting address likely contributors; mixed-quantization checkpoints remain unvalidated. | Measure actual live donor tensor storage and load/unload behavior. Allocation logs and low donor compute utilization do not prove placement. |
 | High | [#202](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/202)/[#186](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/186); [PR #195](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/195) | fixed | aimdo initialization can omit visible GPUs or disturb existing contexts/headroom. | Initialize visible devices together before core startup; preserve primary headroom; do not reinitialize live contexts or mark missing devices initialized. Defer Torch import until core init_device; retain legacy fallback. CPU regressions pass. | - |
 | High | [#191](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/191) | fixed | DynamicVRAM bypasses DisTorch2 donor placement through the patched legacy loading path. | Use legacy ModelPatcher when loading explicitly distributed models; ordinary loaders keep DynamicVRAM. Restore patcher alias and loader device state on errors. Local FLUX donor placement and regressions pass. | - |
@@ -108,8 +108,8 @@ and remaining work together.
 | Medium | [PR #182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182) | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | - |
 
 Suggested implementation order: exception-safe GGUF wrappers, async provider
-compatibility, repeated-run CLIP validation, then mixed-quantization MiniMax
-validation. Windows-specific confirmation is outside this fork's maintenance
+compatibility, then mixed-quantization MiniMax validation. Repeated-run CLIP
+validation is complete for the configurations documented below. Windows-specific confirmation is outside this fork's maintenance
 scope. The GPU-disappearance report still needs evidence from its affected
 hardware. Local WanAnimate validation is documented below; its original
 Windows native crash remains untested.
@@ -281,3 +281,89 @@ failure, nor validate its ZImage checkpoint or every ComfyUI version. The tracke
 marks this fixed for the tested local paths. Windows is **UNTESTED** and outside
 this personal fork's maintenance scope; Windows confirmation is not pending
 maintenance work.
+
+## Repeated CLIP validation (2026-10-10)
+
+[#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) was previously
+partial because the existing runtime guards had only been tested in individual
+generations. The report describes second/third-run corruption with two encoders
+on the secondary GPU, particularly Klein 9B's mixed-FP8 Qwen3 encoder. Its graph
+is not attached, so validation here exercises the relevant encoders and loading
+paths rather than claiming to replay the reporter's exact workflow.
+
+Two code findings were addressed during the investigation:
+
+- Installing DisTorch previously replaced core `load_models_gpu` for every
+  subsequent request with an older copied implementation. Ordinary models and
+  empty-allocation DisTorch2 CLIP models now delegate to the installed core
+  loader, preserving its DynamicVRAM eviction, pin-budget handling, loading
+  order, and argument contract. Explicitly annotated distributed models,
+  including attached models, retain the DisTorch path; older provider contracts
+  retain their existing fallback.
+- Standard CLIP wrappers previously called the provider before entering their
+  device-restoration `try/finally`. Both standard wrapper variants now restore
+  the previous text-encoder selection if loading fails. The older GGUF wrapper
+  finding remains tracked separately; this change does not close that item.
+
+The reported corruption was not reproduced on the current stack, including
+before these two additional changes. Existing runtime guards already kept the
+logical device and actual CUDA device aligned during the tested encoding paths.
+The new changes fix the loading-contract and failure-restoration defects;
+these findings do not establish the cause of the original upstream corruption.
+
+Encoder-only tests alternated Chroma's T5 FP8 and
+`qwen3-8b-fp8-mixed.safetensors` (`flux2`) on `cuda:1`, using the same prompt and
+comparing every conditioning tensor and tensor-valued metadata against saved
+CPU references. The tests used the same CLIP objects through each cycle.
+
+| Loader mode | Repeated warm cycles | Forced unload/reload cycles | Result |
+| --- | --- | --- | --- |
+| Standard MultiGPU | 4 | 3 | All tensors finite and exactly equal to the first-cycle reference. |
+| DisTorch2, empty allocation | 4 | Not separately tested | All tensors finite and exactly equal to the standard-loader reference. |
+| DisTorch2, 4 GiB virtual VRAM with CPU donor | 4 | 3 | All tensors finite and exactly equal to the standard-loader reference after eviction/reload. |
+
+The full generation test used two sequential sampling stages: FLUX.1-dev FP8
+with CLIP-L/T5 FP8, then FLUX.2 Klein 9B FP8 with the mixed-FP8 Qwen3-8B encoder.
+Both CLIPs and both VAEs used the 3060; native diffusion loaders targeted the
+4080. Each run generated 512×512 outputs at seed 185, with 2 steps for FLUX.1
+and 4 steps for Klein. The second-stage encoding depended on first-stage VAE
+decoding, ensuring sampling and VAE work happened between the two encoders.
+The two samplers used independent latents; this tests sequential model/encoder
+switching rather than image-to-image refinement.
+
+Temporary server-side probes forced positive and negative re-encoding on every
+queued run, avoiding false passes from ComfyUI's conditioning cache. Four
+consecutive runs were completed for each configuration:
+
+| First encoder loader | Second encoder loader | Runs | Conditioning and images |
+| --- | --- | --- | --- |
+| Standard MultiGPU | Standard MultiGPU | 4 | Exact tensor and image-pixel matches across all four runs. |
+| Standard MultiGPU | DisTorch2, empty allocation | 4 | Exact matches against the standard-loader reference. |
+| Standard MultiGPU | DisTorch2, 4 GiB virtual VRAM with CPU donor | 4 | Exact matches against the standard-loader reference. |
+
+Across 12 runs, all 48 positive/negative encodes were finite and had maximum
+absolute difference **0** from their references. All 24 output images matched
+their respective stage's reference pixels, including across loader modes.
+Klein produced a coherent red teapot image, verified visually. Neither stage
+showed second/third-run corruption. CUDA current-device state returned to
+GPU 0 after every encoding call.
+
+Seven added CPU regressions cover core/delegated loading, empty and explicit
+allocations, annotated attached models, legacy provider fallback, shared patch
+references, exception propagation, standard CLIP loader failure restoration,
+and per-instance encoder device selection. The complete suite has 37 tests,
+including a separate CUDA-runtime candidate test for missing `torch.__file__`.
+Zed type warnings were corrected by annotating `_coerce_torch_device` as
+`torch.device | None` and checking `torch.__file__` before `dirname`.
+
+The tracker marks #185 `fixed` for this machine under the local status policy.
+These tests validate the installed mixed-FP8 encoder, standard/DisTorch2
+loading, repeated encoding, and forced eviction. The original two-GGUF variant
+was not tested: its Chroma T5 GGUF and Qwen3-8B Q8_0 files are not installed.
+Different core/runtime versions and checkpoints remain outside these results.
+The temporary probe nodes were removed after testing; diagnostic prompts,
+reference tensors, metrics, histories, and images remain in local test backups.
+After probe removal, a fresh 512×512, 2-step FLUX.1 DisTorch2 generation with
+4 GiB virtual VRAM and the 3060 as donor also passed. This checks that preserving
+core loading for ordinary requests does not prevent the distributed generation
+path from executing; it is not an independent measurement of donor storage.
