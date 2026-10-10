@@ -72,18 +72,22 @@ that capture a different class in their closure.
 identifies proposed PRs, not validated fixes. Priority is process crashes first,
 then incorrect GPU allocation, then optional-provider compatibility.
 
-| Priority | Reports | Change and validation |
-| --- | --- | --- |
-| Critical | #187, #210, #218, #220; PR #216 | Prefer Torch's peer API; resolve versioned/Linux and Windows runtimes; all probe failures return false. CPU regressions cover success, failures, caching and platform candidates. Windows runtime execution still needs a Windows rig. |
-| Critical | #211, #213, #222 | Keep comfy-kitchen >=0.2.35 native DLPack exports. Moving tensors inside a per-argument export wrapper can conflict with the kernel's actual device/stream. Older kitchen versions retain the guarded compatibility path and are not validated here. |
-| Critical | Local FP8 CLIP crash; #189/#185 related symptoms | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device, restoring device state on exceptions. CLIP nesting and VAE regressions plus local dual-GPU generation. Similar symptoms alone do not establish that every upstream reproduction is fixed. |
-| Critical, partly addressed | #184; PR #183 | Install the dynamic loading traversal guard at node startup, covering DisTorch2 and core-only loaders before any standard MultiGPU CLIP node runs. Match core parent-module classification and deduplicate shared modules in the parameter walker. Deep-graph CPU regressions and a local empty-allocation DisTorch2 generation pass; the Windows native crash still needs its original reproduction. |
-| High | #202/#186; PR #195 | Initialize visible aimdo devices together before core startup. Preserve the primary GPU's headroom; never reinitialize live contexts or report missing devices as initialized. Defer Torch import until core calls init_device. Existing per-device legacy fallback remains. |
-| High | #191 | DisTorch2 uses legacy ModelPatcher while loading an explicitly distributed model; DynamicVRAM otherwise bypasses donor placement in the patched legacy loading path. Ordinary loaders keep DynamicVRAM. Preserve patcher alias and loader device state on errors. |
-| High | #196; PR #198 | Count unique underlying model parameters by physical nbytes without evaluating parametrized weight properties. Tests cover weight_norm, tied parameters, and packed storage. Buffers and allocator overhead are not included in the parameter estimate. |
-| Medium | #188; PR #200 | Florence2 delegates INPUT_TYPES and forwards args/kwargs so schema changes and upstream model_paths initialization stay intact. Mock provider regressions; Florence2 is not installed locally. |
-| Medium | PR #217 | Recognize ComfyUI-GGUF-Loader as an additional provider. Existing city96 provider remains supported. The alternative provider is not installed locally. |
-| Medium | PR #182 | Copy the schema and modified optional map without recursively copying metadata. Regression checks upstream schema isolation with noncopyable metadata. |
+Status describes this fork: `fixed` means the targeted defect is addressed and
+validated; `partial` means related changes exist but coverage or the original
+reproduction remains unverified; `open` means no validated fix is available.
+
+| Priority | Reports | Status | Change and validation |
+| --- | --- | --- | --- |
+| Critical | #187, #210, #218, #220; PR #216 | partial | Prefer Torch's peer API; resolve versioned/Linux and Windows runtimes; all probe failures return false. CPU regressions cover success, failures, caching and platform candidates. Windows runtime execution still needs a Windows rig. |
+| Critical | #211, #213, #222 | partial | Keep comfy-kitchen >=0.2.35 native DLPack exports. Moving tensors inside a per-argument export wrapper can conflict with the kernel's actual device/stream. Older kitchen versions retain the guarded compatibility path and are not validated here. |
+| Critical | Local FP8 CLIP crash; #189/#185 related symptoms | partial | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device, restoring device state on exceptions. CLIP nesting and VAE regressions plus local dual-GPU generation. Similar symptoms alone do not establish that every upstream reproduction is fixed. |
+| Critical | #184; PR #183 | partial | Install the dynamic loading traversal guard at node startup, covering DisTorch2 and core-only loaders before any standard MultiGPU CLIP node runs. Match core parent-module classification and deduplicate shared modules in the parameter walker. Deep-graph CPU regressions and a local empty-allocation DisTorch2 generation pass; the Windows native crash still needs its original reproduction. |
+| High | #202/#186; PR #195 | fixed | Initialize visible aimdo devices together before core startup. Preserve the primary GPU's headroom; never reinitialize live contexts or report missing devices as initialized. Defer Torch import until core calls init_device. Existing per-device legacy fallback remains. |
+| High | #191 | fixed | DisTorch2 uses legacy ModelPatcher while loading an explicitly distributed model; DynamicVRAM otherwise bypasses donor placement in the patched legacy loading path. Ordinary loaders keep DynamicVRAM. Preserve patcher alias and loader device state on errors. |
+| High | #196; PR #198 | fixed | Count unique underlying model parameters by physical nbytes without evaluating parametrized weight properties. Tests cover weight_norm, tied parameters, and packed storage. Buffers and allocator overhead are not included in the parameter estimate. |
+| Medium | #188; PR #200 | partial | Florence2 delegates INPUT_TYPES and forwards args/kwargs so schema changes and upstream model_paths initialization stay intact. Mock provider regressions; Florence2 is not installed locally. |
+| Medium | PR #217 | partial | Recognize ComfyUI-GGUF-Loader as an additional provider. Existing city96 provider remains supported. The alternative provider is not installed locally. |
+| Medium | PR #182 | fixed | Copy the schema and modified optional map without recursively copying metadata. Regression checks upstream schema isolation with noncopyable metadata. |
 
 Other open reports remain tracked upstream. #219's WanAnimate2Cache int8 crash,
 #203's async-provider signature changes, repeat-run model corruption (#185),
