@@ -97,42 +97,6 @@ def _create_distorch_safetensor_v2_override(
                 else get_current_text_encoder_device()
             )
 
-            import comfy.model_management as mm
-
-            if eject_models:
-                logger.mgpu_mm_log(
-                    f"[EJECT_MODELS_SETUP] eject_models=True - marking all loaded models for eviction, device target: {device_value}"
-                )
-                ejection_count = 0
-                for i, lm in enumerate(mm.current_loaded_models):
-                    # Set _mgpu_unload_distorch_model=True on all models to force Comfy Core eviction
-                    model_name = (
-                        type(getattr(lm.model, "model", lm.model)).__name__
-                        if lm.model
-                        else "Unknown"
-                    )
-
-                    if hasattr(lm.model, "model") and lm.model.model is not None:
-                        lm.model.model._mgpu_unload_distorch_model = True
-                        logger.mgpu_mm_log(
-                            f"[EJECT_MARKED] Model {i}: {model_name} (id=0x{id(lm):x}) → marked for eviction"
-                        )
-                        ejection_count += 1
-                    elif lm.model is not None:
-                        lm.model._mgpu_unload_distorch_model = True
-                        logger.mgpu_mm_log(
-                            f"[EJECT_MARKED] Model {i}: {model_name} (direct patcher) → marked for eviction"
-                        )
-                        ejection_count += 1
-
-                logger.mgpu_mm_log(
-                    f"[EJECT_MODELS_SETUP_COMPLETE] Marked {ejection_count} models for Comfy Core eviction during load_models_gpu"
-                )
-            else:
-                logger.mgpu_mm_log(
-                    "[EJECT_MODELS_SETUP] eject_models=False - loading without eviction"
-                )
-
             try:
                 if device_value is not None:
                     device_setter_func(device_value)
@@ -182,7 +146,10 @@ def _create_distorch_safetensor_v2_override(
 
                 if model_to_check and full_allocation:
                     inner_model = model_to_check.model
-                    inner_model._distorch_v2_meta = {"full_allocation": full_allocation}
+                    inner_model._distorch_v2_meta = {
+                        "full_allocation": full_allocation,
+                        "eject_models": eject_models,
+                    }
 
                 logger.info(f"[MultiGPU DisTorch V2] Full allocation string: {full_allocation}")
 

@@ -38,6 +38,7 @@ Completed generation tests:
 | Krea2 RAW FP8 + LoRA + DyPE | `krea2-raw-fp8.safetensors`; `qwen3-vl-4b-fp8-scaled.safetensors`; `qwen-image-vae-bf16.safetensors` (renamed after the test); Karina LoRA `aespakarina_krea2v3_27_qfloat8.safetensors` at 0.9 | 512×512 smoke test and 896×1200, 25-step generation passed; full run took 68.14 seconds after switching from FLUX. |
 | FLUX.1-dev FP8 + DisTorch2 + DyPE | `flux1-dev-fp8.safetensors`; `clip-l.safetensors` + `t5xxl-fp8-e4m3fn-scaled.safetensors`; `ae.safetensors` | 512×512, 2-step generation passed; measured donor placement was 4080.60 MiB on the 3060, with 7674.75 MiB on the 4080. |
 | Wan Animate 2 distilled INT8 ConvRot | `wan-animate-2-distill-int8-convrot.safetensors`; `umt5-xxl-fp8-e4m3fn-scaled.safetensors`; `clip-vision-h.safetensors`; `wan-v2.1-vae-bf16.safetensors` | 480×832, 10 steps: 49 frames passed with CPU/default and GPU/int8 cache; 81 frames passed with CPU/default cache. See the cache validation below for OOM cases and limits. |
+| MiniMax H3 mixed INT4/INT8 + INT4 encoder | FL2VA and REF2VA pruned ConvRot checkpoints; Qwen3-VL-32B INT4 ConvRot; MiniMax video FP16 and audio FP32 VAEs | Both variants passed 128×128, 5-frame, 2-step AV sampling and decoding. Donor storage remains about 5.96 GiB throughout sampling; CLIP and both VAEs execute on the 3060. See [validation](#minimax-mixed-quantization-validation-2026-10-10). |
 
 A 2-step smoke test checks execution, not final image quality.
 
@@ -61,7 +62,7 @@ unused-parameter, and deprecated-API warnings enabled. Host and optional-provide
 imports may be absent; [typings/nodes.pyi](../typings/nodes.pyi) supplies the core
 registry contract. Dynamic logger methods use an explicit `Any` boundary.
 
-As of 2026-10-10, all **41 regression tests** pass on the host and in the
+As of 2026-10-10, all **51 regression tests** pass on the host and in the
 production container. Ruff, formatting, basedpyright, and GitHub CI pass.
 
 ## Upstream triage
@@ -85,7 +86,7 @@ validated fix is available. Untested models/providers remain in those states.
 | High | Local code finding: older GGUF wrappers | fixed | Provider calls and result processing could fail before device restoration. | Protect setup, loading, and metadata handling in all four older wrappers. Regressions cover setup/provider/output errors and preserve the previous device. | - |
 | High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | fixed | Async/await errors prevent generation; wrappers assumed synchronous providers. | Preserve synchronous/async execution contracts across all loader wrapper families; await before processing results. Restore device and patcher state between async steps, on errors, and on cancellation. Local executor probes pass; the report supplies no exact graph/provider version to replay. See [validation](#loader-execution-validation-2026-10-10). | - |
 | High | [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) | fixed | Switching encoders on GPU 1 reportedly produces garbled output after two or three runs, particularly Flux.2 Klein FP8. | Preserve core loading for ordinary/empty-allocation requests after DisTorch installs its patches; restore CLIP loader device selection on failures. Repeated encoder and two-stage generation tests pass with mixed-FP8 Qwen3-8B: conditioning and output pixels match exactly across runs and loader modes. See [validation](#repeated-clip-validation-2026-10-10). | - |
-| High | [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209) | partial | MiniMax H3 mixed INT8/INT4 allocation is accepted while donor VRAM reportedly stays nearly empty. | DynamicVRAM bypass and physical-storage accounting address likely contributors; mixed-quantization checkpoints remain unvalidated. | Measure actual live donor tensor storage and load/unload behavior. Allocation logs and low donor compute utilization do not prove placement. |
+| High | [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209) | fixed | MiniMax H3 mixed INT8/INT4 donor allocation reportedly leaves GPU 1 nearly empty. Combined local runs also exposed donor-memory OOM and a native allocation-recording crash. | Legacy patcher allocation places real packed weights and metadata on the donor. Reserve storage on every assigned GPU; evict unused donor residents; pause recording around cross-GPU quantized metadata allocation. Both installed diffusion variants and the INT4 encoder pass placement/reload tests; consecutive AV sampling and decoding pass. See [validation](#minimax-mixed-quantization-validation-2026-10-10). | - |
 | High | [#202](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/202)/[#186](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/186); [PR #195](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/195) | fixed | aimdo initialization can omit visible GPUs or disturb existing contexts/headroom. | Initialize visible devices together before core startup; preserve primary headroom; do not reinitialize live contexts or mark missing devices initialized. Defer Torch import until core init_device; retain legacy fallback. CPU regressions pass. | - |
 | High | [#191](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/191) | fixed | DynamicVRAM bypasses DisTorch2 donor placement through the patched legacy loading path. | Use legacy ModelPatcher when loading explicitly distributed models; ordinary loaders keep DynamicVRAM. Restore patcher alias and loader device state on errors. Local FLUX donor placement and regressions pass. | - |
 | High | [#196](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/196); [PR #198](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/198) | fixed | Parameter estimates evaluate parametrized weights or miscount tied/packed storage. | Count unique underlying parameters by physical nbytes. Tests cover weight_norm, tied parameters, and packed storage; buffers and allocator overhead remain outside this estimate. | - |
@@ -93,8 +94,9 @@ validated fix is available. Untested models/providers remain in those states.
 | Medium | [PR #217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217) | partial | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. The alternative provider is not installed locally. | Validate loading with the alternative provider. |
 | Medium | [PR #182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182) | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | - |
 
-Next: mixed-quantization MiniMax validation ([#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209)). The GPU-disappearance report still needs
-a reproducible graph and driver logs from the affected hardware.
+Remaining validation needs the Florence2 and alternative GGUF providers.
+The GPU-disappearance report [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212)
+still needs a reproducible graph and driver logs from the affected hardware.
 
 WanVideo/LTX feature requests are outside this crash-fix tracker;
 [LTXV2 PR #164](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/164) is not merged.
@@ -327,3 +329,50 @@ A production-node FLUX.1-dev FP8 + DyPE generation completed in 9 seconds at
 production node IDs and input schemas were checked against the pre-change API.
 Prompts and histories are saved under
 `/srv/appdata/comfyui/user/default/workflow-backups/issue185/loader-*`.
+
+## MiniMax mixed-quantization validation (2026-10-10)
+
+Tested `minimax-h3-fl2va-pruned-mixed-int4-int8-convrot.safetensors`,
+`minimax-h3-ref2va-pruned-mixed-int4-int8-convrot.safetensors`, and
+`qwen3-vl-32b-minimax-h3-int4-convrot.safetensors`. Measurements count unique
+backing storage, including packed weights, quantization metadata, and buffers.
+Each standalone model completed two load/unload cycles with a 6 GiB donation
+from `cuda:1` to compute device `cuda:0`:
+
+| Model | 4080 storage (MiB) | 3060 donor storage (MiB) |
+| --- | --- | --- |
+| FL2VA mixed INT4/INT8 | 9062.38 | 6101.13 |
+| REF2VA mixed INT4/INT8 | 8290.75 | 6101.01 |
+| Qwen3-VL-32B INT4 | 8121.57 | 6137.23 |
+
+Placement survived reloads; unloading returned model storage to CPU. The encoder
+also passed two encodes. Whole-layer allocation explains the small difference
+from the requested 6 GiB.
+
+Combined sampling initially hit OOM because eviction considered only the
+compute GPU. After reserving donor memory, sampling exposed a process abort
+while cloning donor quantization metadata inside the compute GPU's allocation
+recorder. Fixes in `src/distributed_memory.py`:
+
+- Reserve the pending storage of actual assigned blocks on every device and
+  protect the models in the current load request. Preserve the explicit
+  `eject_models` toggle in modern loader-wrapper metadata.
+- After core eviction, detach unused distributed models holding storage on the
+  requested donor GPU, even when their compute device differs.
+- Pause native allocation recording around cross-GPU quantized `empty_like`
+  handling. This kitchen handler guard survives core's per-prompt function
+  restoration; same-device and CPU transfers retain their normal handling.
+
+Consecutive requests passed with `eject_models=False`, allocation recording
+still enabled, diffusion on the 4080 with 6 GiB requested from the 3060, and the
+encoder on the 3060 with 6 GiB offloaded to CPU. Both diffusion variants produced
+finite AV latents and decoded five 128×128 frames plus 32 kHz audio using the
+3060's VAEs. REF2VA decoding completed in 10.57 seconds; FL2VA in 26.43 seconds.
+Sampling measurements stayed at the donor storage shown above through both
+steps. These are execution tests with no reference images, not quality tests.
+
+The guard is validated with comfy-kitchen 0.2.37's generic dispatch table.
+Prompts, storage measurements, histories, and crash traces are saved under
+`/srv/appdata/comfyui/user/default/workflow-backups/issue209/`; generated frames
+and audio are in the output directory's `issue209/` folder. Temporary probe
+nodes were removed after validation.

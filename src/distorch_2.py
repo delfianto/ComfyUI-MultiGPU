@@ -16,6 +16,11 @@ import comfy.model_patcher
 
 from .compatibility import preserve_core_model_loading
 from .device_utils import get_device_list
+from .distributed_memory import (
+    allocation_memory_required,
+    preserve_distributed_eviction,
+    register_quantized_allocation_guard,
+)
 from .memory_utils import model_parameter_bytes
 from .model_management_mgpu import multigpu_memory_log
 
@@ -134,53 +139,34 @@ def register_patched_safetensor_modelpatcher():
                     model_to_unload.model.detach(unpatch_all=False)
                     model_to_unload.model_finalizer.detach()
 
-            # DisTorch Processing
+            # Plan actual block placement before eviction, including donor devices.
+            # Existing resident weights do not need a second reservation on reload.
             total_memory_required = {}
-            eject_device = None
-
+            eject_devices = set()
             for loaded_model in models_to_load:
-                device = loaded_model.device
-                base_memory = loaded_model.model_memory_required(device)
-
-                inner_model = loaded_model.model.model
-
-                if hasattr(inner_model, "_distorch_v2_meta"):
-                    meta = inner_model._distorch_v2_meta
-                    allocation_str = meta["full_allocation"]
-
-                    # Parse allocation string: "expert#compute_device;virtual_vram_gb;donors"
-                    parts = allocation_str.split("#")
-                    virtual_vram_gb = 0.0
-                    has_eject = False
-
-                    if len(parts) > 1:
-                        virtual_vram_str = parts[1]
-                        virtual_info = virtual_vram_str.split(";")
-                        if len(virtual_info) > 1:
-                            virtual_vram_gb = float(virtual_info[1])
-                        if len(virtual_info) > 2 and virtual_info[2]:
-                            has_eject = True
-
-                    if has_eject:
-                        eject_device = device
-                        logger.mgpu_mm_log("DisTorch eject_models detected - MAX memory eviction")
-
-                    virtual_vram_bytes = virtual_vram_gb * (1024**3)
-                    adjusted_memory = max(0, base_memory - virtual_vram_bytes)
-                    total_memory_required[device] = (
-                        total_memory_required.get(device, 0) + adjusted_memory
+                model = loaded_model.model
+                metadata = getattr(model.model, "_distorch_v2_meta", None)
+                if metadata and metadata.get("full_allocation"):
+                    allocations = metadata["full_allocation"]
+                    plan = analyze_safetensor_loading(
+                        model, allocations, is_clip=getattr(model, "is_clip", False)
                     )
-                    logger.mgpu_mm_log(
-                        f"DisTorch model adjusted {(base_memory - virtual_vram_bytes) / (1024**3):.2f}GB for device {device}"
-                    )
+                    model._distorch_cached_assignments = plan
+                    model._distorch_last_allocations = allocations
+                    requirements = allocation_memory_required(plan)
+                    # Modern wrappers preserve the explicit toggle. Older
+                    # metadata retains its former virtual-allocation behavior.
+                    eject = metadata.get("eject_models", ";" in allocations.split("#")[-1])
+                    if eject:
+                        eject_devices.update(
+                            device for device in requirements if device.type == "cuda"
+                        )
                 else:
-                    # Standard model: use full model size
-                    total_memory_required[device] = (
-                        total_memory_required.get(device, 0) + base_memory
-                    )
-                    logger.mgpu_mm_log(
-                        f"[LOAD_MODELS_GPU] Standard model {(base_memory) / (1024**3):.2f}GB for device {device}"
-                    )
+                    requirements = {
+                        loaded_model.device: loaded_model.model_memory_required(loaded_model.device)
+                    }
+                for device, amount in requirements.items():
+                    total_memory_required[device] = total_memory_required.get(device, 0) + amount
 
             for device, device_memory in total_memory_required.items():
                 if device != torch.device("cpu"):
@@ -193,17 +179,12 @@ def register_patched_safetensor_modelpatcher():
 
             for device, device_memory in total_memory_required.items():
                 if device != torch.device("cpu"):
-                    if device == eject_device:
-                        total_device_memory = mm.get_total_memory(device)
-                        logger.mgpu_mm_log(
-                            f"[LOAD_MODELS_GPU] eject_models=1, is_distorch=1 → using MAX memory ({total_device_memory / (1024**3):.2f}GB) for eviction"
-                        )
-                        free_memory(total_device_memory, device)
-                    else:
-                        logger.mgpu_mm_log(
-                            f"[LOAD_MODELS_GPU] eject_models=0, using Comfy Core Computed memory ({(device_memory * 1.1 + extra_mem) / (1024**3):.2f}GB) for eviction"
-                        )
-                        free_memory(device_memory * 1.1 + extra_mem, device)
+                    requested = (
+                        mm.get_total_memory(device)
+                        if device in eject_devices
+                        else device_memory * 1.1 + extra_mem
+                    )
+                    free_memory(requested, device, keep_loaded=models_to_load)
 
             multigpu_memory_log("free_memory/minimum_memory_required", "post/pre")
 
@@ -217,7 +198,9 @@ def register_patched_safetensor_modelpatcher():
                     )
 
                     if free_mem < minimum_memory_required:
-                        models_l = free_memory(minimum_memory_required, device)
+                        models_l = free_memory(
+                            minimum_memory_required, device, keep_loaded=models_to_load
+                        )
                         logger.mgpu_mm_log(
                             f"[EVICTION] Device {device}: unloaded {len(models_l)} models due to insufficient memory"
                         )
@@ -258,6 +241,21 @@ def register_patched_safetensor_modelpatcher():
                     lowvram_model_memory, force_patch_weights=force_patch_weights
                 )
                 current_loaded_models.insert(0, loaded_model)
+
+        # Core also needs to see unused donor residents when a normal VAE/CLIP
+        # loader asks for memory on their storage GPU.
+        mm.free_memory = preserve_distributed_eviction(mm.free_memory, mm)
+
+        try:
+            from comfy import model_prefetch
+            from comfy_kitchen.tensor import base as tensor_base
+        except ImportError:
+            # Older core/kitchen versions have no allocation recorder to guard.
+            pass
+        else:
+            pause_graph = getattr(model_prefetch, "pause_malloc_graph", None)
+            if callable(pause_graph):
+                register_quantized_allocation_guard(tensor_base, pause_graph)
 
         # Replace the module function
         mm.load_models_gpu = preserve_core_model_loading(
