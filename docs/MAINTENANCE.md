@@ -433,6 +433,63 @@ are saved under
 Videos, frames and audio are under
 `/home/geist/Pictures/StableDiffusion/ltx25-validation/`.
 
+## Workflow-switching stress test (2026-10-10)
+
+Completed three rounds across 11 model families, with an initial LTX reference
+and an immediate LTX repeat at the end: **35 successful generations**. Private
+API variants use the saved workflows' loaders, LoRAs and DyPE branches at moderate
+sizes. Temporary nodes force fresh text encoding and check tensors before saving;
+the running process is retained between workflows.
+
+| Workflows | Stress settings |
+| --- | --- |
+| Krea2 RAW + Karina LoRA + DyPE | 512×768, 20 steps |
+| FLUX.1-dev + DisTorch2 + DyPE | 512×512, 12 steps, 4 GiB requested from the 3060 |
+| SDXL IntoRealism / ReaPony | 640×768, 20 steps each, checkpoint CLIP/VAE on the 3060 |
+| Z-Image Moody / Qwen Image 2.1 Noct Q + DyPE | 512×768, 12 steps each |
+| FLUX.2 Klein 9B | 512×512, 4 steps, mixed-FP8 Qwen3 encoder on the 3060 |
+| Ideogram 4 precise core | 512×512, 12 steps, main and unconditional diffusion models |
+| Wan Animate 2 | 480×832, 49 frames, 10 steps, GPU/int8 cache |
+| MiniMax H3 FL2VA / REF2VA | 128×128, 5 frames, 2 steps; REF2VA in round two |
+| LTX-2.5 | 33 frames, 256×256 → 512×512, 8+3 steps, untiled decode |
+
+The original settings did **not** pass the stress test:
+
+- With the default RAM-pressure node cache, the second consecutive LTX request
+  caused sustained host memory pressure. `systemd-oomd` killed ComfyUI; both GPUs
+  remained visible and no CUDA fault was recorded.
+- Disabling pinned memory alone still crossed the test watchdog's 6 GiB RAM
+  floor on the next LTX request. Classic caching crossed that floor while loading
+  Ideogram after seven image-model runs. These watchdog stops are incomplete
+  tests, not native OOM or CUDA failures.
+- `--cache-none` completed a full switching round. In round two, changing Wan to
+  CPU/default cache crossed the RAM floor; the watchdog stopped the service.
+  The remaining cases resumed after restarting with GPU/int8 cache. Thus the
+  three rounds were **not one uninterrupted run**.
+
+The completed profile uses `--cache-none`, normal pinned-memory settings and
+Wan GPU/int8 cache. It produced **145 passing finite-value checks**: 67
+conditioning, 35 latent, 35 image and 8 audio checks. Successful runs retained
+at least 10.45 GiB available host RAM in the two-second samples. No generation
+error, CUDA fault or watchdog stop occurred in the remaining GPU/int8 cases.
+The final switched LTX video and its immediate repeat match the fresh reference
+exactly across all 33 PNG frames. Decoded audio is finite; 16-bit PCM differences
+are at most two units (normalized difference 0.0000611), rather than bit-identical.
+Representative image outputs were inspected visually; MiniMax's two-step case
+checks execution only.
+
+The Compose service now uses `--cache-none` to limit retained node results.
+This costs loader reuse and re-executes unchanged nodes. It is a tested workaround,
+not a root-cause fix for RAM retention, and does not validate cached-model reuse
+under the failing policies. Follow-up work is to identify the retained allocations
+and test bounded caching without recreating host-wide memory stalls.
+
+Temporary probes were removed and the original production node registry restored.
+Prompts, histories, finite checks, sampled GPU/host memory, watchdog stops,
+`systemd-oomd` logs and comparisons are under
+`/srv/appdata/comfyui/user/default/workflow-backups/model-switch-stress/`.
+Outputs are under `/home/geist/Pictures/StableDiffusion/model-switch-stress/`.
+
 ## Optional provider validation (2026-10-10)
 
 Tested real provider checkouts in a separate process inside the production

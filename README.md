@@ -20,11 +20,10 @@ for other setups or checkpoints is outside scope.**
 I run ComfyUI on CachyOS Linux with rootless Docker: an **RTX 4080 16 GB** for
 diffusion and an **RTX 3060 12 GB** for CLIP/VAE and donor storage.
 
-Tested configurations include Krea2 RAW FP8 with LoRA and DyPE, FLUX.1-dev FP8
-with DisTorch2 and DyPE, FLUX.2 Klein 9B FP8 with repeated encoder switching,
-Wan Animate 2 with CPU/default and GPU/int8 cache, MiniMax H3 mixed INT4/INT8,
-and LTX-2.5 distilled INT8 ConvRot with audio and two-stage spatial upscaling.
-Hardware, runtime versions, model filenames, results, and remaining issues are in
+Tested models include Krea2 with LoRA/DyPE, FLUX.1/2, Z-Image, Qwen Image 2.1,
+SDXL/Pony, Ideogram 4, Wan Animate, MiniMax H3 and LTX-2.5. Workflow-switching
+tests use node-result caching disabled after the default cache caused host RAM
+pressure. Hardware, model files, results and limits are in
 [the maintenance notes](docs/MAINTENANCE.md).
 
 ## Installation
