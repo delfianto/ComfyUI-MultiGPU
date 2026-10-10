@@ -34,10 +34,11 @@ These are completed generation tests, not a list of everything installed:
 
 | Configuration | Models and components | Test and result |
 | --- | --- | --- |
-| Krea2 RAW FP8 + LoRA + DyPE | `krea2-raw-fp8.safetensors`; `qwen3-vl-4b-fp8-scaled.safetensors`; `qwen-image-vae.safetensors`; Karina LoRA `aespakarina_krea2v3_27_qfloat8.safetensors` at 0.9 | 512×512 smoke test and 896×1200, 25-step generation passed; full run took 68.14 seconds after switching from FLUX. |
+| Krea2 RAW FP8 + LoRA + DyPE | `krea2-raw-fp8.safetensors`; `qwen3-vl-4b-fp8-scaled.safetensors`; `qwen-image-vae-bf16.safetensors` (renamed after the test); Karina LoRA `aespakarina_krea2v3_27_qfloat8.safetensors` at 0.9 | 512×512 smoke test and 896×1200, 25-step generation passed; full run took 68.14 seconds after switching from FLUX. |
 | FLUX.1-dev FP8 + DisTorch2 + DyPE | `flux1-dev-fp8.safetensors`; `clip-l.safetensors` + `t5xxl-fp8-e4m3fn-scaled.safetensors`; `ae.safetensors` | 512×512, 2-step generation passed; measured donor placement was 4080.60 MiB on the 3060, with 7674.75 MiB on the 4080. |
+| Wan Animate 2 distilled INT8 ConvRot | `wan-animate-2-distill-int8-convrot.safetensors`; `umt5-xxl-fp8-e4m3fn-scaled.safetensors`; `clip-vision-h.safetensors`; `wan-v2.1-vae-bf16.safetensors` | 480×832, 10 steps: 49 frames passed with CPU/default and GPU/int8 cache; 81 frames passed with CPU/default cache. See the cache validation below for OOM cases and limits. |
 
-CLIP/VAE used `cuda:1` in both configurations. The FLUX test confirms execution
+CLIP/VAE used `cuda:1` in these configurations. The FLUX test confirms execution
 and donor placement; a 2-step smoke test does not establish final image quality.
 Qwen Image 2.1, other checkpoints, Windows hardware, and optional video providers
 have not been validated by these generation runs.
@@ -123,9 +124,12 @@ need the original reproduction before we can claim these issues are resolved.
   cache settings complete. The report uses comfy-kitchen 0.2.31, for which this
   fork retains the legacy DLPack patch. Reproduce the official WanAnimate graph,
   isolate the active patches, and investigate tensor lifetime, device, and
-  stream handling. Our native-DLPack handling for newer kitchen versions may
-  help, but it has not been validated with this workflow. Capture native crash
-  diagnostics in an isolated test process.
+  stream handling. Local validation with kitchen 0.2.37 now passes 49-frame
+  GPU/int8 generation and 81-frame CPU/default generation. The 81-frame GPU/int8
+  cases return ordinary OOM errors without killing the service. See
+  [WanAnimate cache validation](#wananimate-cache-validation-2026-10-10).
+  The original Windows/older-kitchen native crash remains unverified; capture
+  native crash diagnostics in an isolated test process if it reproduces.
 - [ ] **Critical: Windows DynamicVRAM stack overflow —
   [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184).** Reports
   include failures even without MultiGPU nodes in the graph. A nonrecursive
@@ -209,7 +213,8 @@ Both GPUs have initialized aimdo contexts, and modern DLPack is unpatched.
 
 Prompts, history, validation results, and the portrait are saved under
 `/srv/appdata/comfyui/user/default/workflow-backups/multigpu-fork-migration/`.
-These runs cover the installed image models, not every optional video provider.
+These initial runs cover the installed image models, not every optional video
+provider. Native WanAnimate coverage was added separately below.
 
 Editor diagnostic cleanup: CLI/CI now enable unused-variable, unused-parameter,
 and deprecated-API warnings, matching the tagged hints exposed by Zed. Intentional
@@ -222,3 +227,56 @@ root web documentation route returned HTTP 200. All 22 regression tests passed
 on the host and in the container; Ruff/basedpyright and the editor language server
 were clean. A fresh 512×512 Krea2 + LoRA + DyPE smoke generation completed in
 8.65 seconds with the model on cuda:0 and CLIP/VAE on cuda:1.
+
+## WanAnimate cache validation (2026-10-10)
+
+Tested upstream [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219)
+with the current fork and runtime above. This tests native WanAnimate 2, not
+the older Wan 2.2 Animate model or WanVideoWrapper. The API graph is adapted
+from the official distilled motion-transfer blueprint, using its public
+reference image and driving video. Context windows are not enabled.
+
+The diffusion model computes on cuda:0; UMT5, CLIP vision, and VAE encoding and
+decoding use cuda:1. Full runs use 480×832, seed 219, 10 LCM/simple steps,
+CFG 1, and shift 5. The active allocator is cudaMallocAsync, with DynamicVRAM
+enabled for ordinary loaders. About 2.5 GiB of primary-GPU memory was already
+in use before the tests. Other services were not stopped to free that memory.
+
+| Frames | Cache | Loader / storage | Result | Server execution time |
+| --- | --- | --- | --- | --- |
+| 49 | CPU / default | Ordinary MultiGPU loader | Passed; 49 output frames | 115.91 s |
+| 49 | GPU / int8 | Ordinary MultiGPU loader | Passed; 49 output frames | 98.15 s |
+| 81 | CPU / default | Ordinary MultiGPU loader | Passed; 81 output frames | 202.67 s |
+| 81 | GPU / int8 | Ordinary MultiGPU loader | Recoverable CUDA OOM during activation allocation | 48.43 s |
+| 81 | GPU / int8 | DisTorch2: 3 GiB cuda:0, 8 GiB cuda:1, remainder CPU | Recoverable CUDA OOM | 25.60 s |
+| 81 | GPU / int8 | DisTorch2: 1 GiB cuda:0, 8 GiB cuda:1, remainder CPU | Recoverable CUDA OOM | 18.51 s |
+
+The first DisTorch2 run assigned 3094.15 MiB of layers to cuda:0, 8168.53 MiB
+to cuda:1, and 4614.47 MiB to CPU, plus 3.38 MiB of small layers on cuda:0.
+This verifies quantized donor placement, not successful completion of that
+configuration. Shifting weights did not leave enough memory for the larger
+GPU cache and activation working set on this setup.
+
+Successful outputs have the expected frame counts and dimensions. Selected
+frames were checked for nonblank content, and the 49-frame CPU/GPU contact
+sheet was visually inspected. Mean absolute RGB differences at frames
+0/16/32/48 were 3.42/2.64/1.83/2.65 on the 0–255 scale. This is a diagnostic
+comparison from one seed, not a general quality or performance benchmark.
+
+ComfyUI remained responsive after each OOM. A fresh-seed 192×320, 17-frame,
+two-step GPU/int8 run then passed in 9.17 s without restarting the service.
+No silent process death or CUDA illegal-address failure was observed. The
+original report used Windows, Blackwell GPUs, kitchen 0.2.31, and DynamicVRAM
+disabled, so this does not establish that its original reproduction is fixed.
+No additional runtime patch was made from these results.
+
+For this hardware, use GPU/int8 cache at the tested 49-frame size and
+CPU/default cache at 81 frames. The three passing API prompts and setup
+instructions are in [the WanAnimate examples](example_workflows/wan-animate-2/README.md).
+They are manual GPU regression cases; CPU-only GitHub CI cannot validate them.
+
+Local prompts, histories, server logs, comparison previews, and the validation
+summary are saved under
+`/srv/appdata/comfyui/user/default/workflow-backups/wananimate-issue219/`.
+Animated outputs are under
+`/home/geist/Pictures/StableDiffusion/wananimate-issue219/`.

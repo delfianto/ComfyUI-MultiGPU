@@ -1,0 +1,254 @@
+{
+  "1": {
+    "class_type": "UNETLoaderMultiGPU",
+    "inputs": {
+      "unet_name": "wan-animate-2-distill-int8-convrot.safetensors",
+      "weight_dtype": "default",
+      "device": "cuda:0"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoaderMultiGPU",
+    "inputs": {
+      "clip_name": "umt5-xxl-fp8-e4m3fn-scaled.safetensors",
+      "type": "wan",
+      "device": "cuda:1"
+    }
+  },
+  "3": {
+    "class_type": "VAELoaderMultiGPU",
+    "inputs": {
+      "vae_name": "wan-v2.1-vae-bf16.safetensors",
+      "device": "cuda:1"
+    }
+  },
+  "4": {
+    "class_type": "CLIPVisionLoaderMultiGPU",
+    "inputs": {
+      "clip_name": "clip-vision-h.safetensors",
+      "device": "cuda:1"
+    }
+  },
+  "5": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "wananimate-test-pink_hair_mech_arms_ref.png"
+    }
+  },
+  "6": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "wananimate-test-street_dance_drive.mp4"
+    }
+  },
+  "7": {
+    "class_type": "VideoFrameSample",
+    "inputs": {
+      "video": [
+        "6",
+        0
+      ],
+      "num_frames": 49,
+      "strategy": "head",
+      "seed": 0
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "A woman with pink hair and mechanical arms dances smoothly. Full body, coherent motion, detailed face."
+    }
+  },
+  "9": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "blurry, distorted, static, poor quality"
+    }
+  },
+  "10": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "4",
+        0
+      ],
+      "image": [
+        "5",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "11": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "batch_index": 0,
+      "length": 1
+    }
+  },
+  "12": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "4",
+        0
+      ],
+      "image": [
+        "11",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "13": {
+    "class_type": "WanAnimate2ToVideo",
+    "inputs": {
+      "positive": [
+        "8",
+        0
+      ],
+      "negative": [
+        "9",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "width": 480,
+      "height": 832,
+      "length": 49,
+      "batch_size": 1,
+      "video_frame_offset": 0,
+      "pose_strength": 1.0,
+      "pose_start_percent": 0.0,
+      "pose_end_percent": 1.0,
+      "reference_image_strength": 1.0,
+      "reference_image": [
+        "5",
+        0
+      ],
+      "pose_video": [
+        "20",
+        0
+      ],
+      "clip_vision_output": [
+        "10",
+        0
+      ],
+      "clip_vision_output_pose": [
+        "12",
+        0
+      ]
+    }
+  },
+  "14": {
+    "class_type": "WanAnimate2Cache",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "device": "cpu",
+      "dtype": "default"
+    }
+  },
+  "15": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "14",
+        0
+      ],
+      "shift": 5.0
+    }
+  },
+  "16": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "15",
+        0
+      ],
+      "seed": 219,
+      "steps": 10,
+      "cfg": 1.0,
+      "sampler_name": "lcm",
+      "scheduler": "simple",
+      "positive": [
+        "13",
+        0
+      ],
+      "negative": [
+        "13",
+        1
+      ],
+      "latent_image": [
+        "13",
+        2
+      ],
+      "denoise": 1.0
+    }
+  },
+  "17": {
+    "class_type": "TrimVideoLatent",
+    "inputs": {
+      "samples": [
+        "16",
+        0
+      ],
+      "trim_amount": [
+        "13",
+        3
+      ]
+    }
+  },
+  "18": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "17",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "19": {
+    "class_type": "SaveAnimatedWEBP",
+    "inputs": {
+      "images": [
+        "18",
+        0
+      ],
+      "filename_prefix": "wananimate-issue219/cpu-default-49f",
+      "fps": 16.0,
+      "lossless": false,
+      "quality": 90,
+      "method": "default"
+    }
+  },
+  "20": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "7",
+        0
+      ]
+    }
+  }
+}

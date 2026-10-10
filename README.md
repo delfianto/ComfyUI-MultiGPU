@@ -19,9 +19,10 @@ sequence.
 
 My setup uses an **RTX 4080 16 GB** for diffusion and an **RTX 3060 12 GB** for
 CLIP/VAE, with the 3060 also acting as a DisTorch2 donor when needed. So far, I
-have tested Krea2 RAW FP8 with a character LoRA and DyPE, and FLUX.1-dev FP8 with
-DisTorch2 and DyPE. Details, model filenames, software versions, and test limits
-are in [docs/MAINTENANCE.md](docs/MAINTENANCE.md).
+have tested Krea2 RAW FP8 with a character LoRA and DyPE, FLUX.1-dev FP8 with
+DisTorch2 and DyPE, and native Wan Animate 2 with CPU/default and GPU/int8 cache.
+Details, model filenames, software versions, and test limits are in
+[docs/MAINTENANCE.md](docs/MAINTENANCE.md).
 
 The local fixes cover encoder execution devices, CUDA/P2P probing, modern
 comfy-kitchen compatibility, DynamicVRAM initialization, DisTorch2 allocation
