@@ -119,8 +119,8 @@ them there:
 
 The service bind-mounts this checkout at `/data/custom_nodes/ComfyUI-MultiGPU`.
 Apply Python edits with `composectl restart ai-comfyui --json`; rebuilding the
-image is unnecessary. GGUF is bundled in the image; MultiGPU loads from the
-persistent checkout. Keep serialized node names compatible with existing flows.
+image is unnecessary. GGUF and MultiGPU load from persistent checkouts under
+`/data/custom_nodes`. Keep serialized node names compatible with existing flows.
 The registry PublisherId is retained as historical metadata.
 
 Initial deployment used image `78549b8cbea2`. Both GPUs had initialized aimdo
@@ -478,11 +478,16 @@ are at most two units (normalized difference 0.0000611), rather than bit-identic
 Representative image outputs were inspected visually; MiniMax's two-step case
 checks execution only.
 
-The Compose service now uses `--cache-none` to limit retained node results.
-This costs loader reuse and re-executes unchanged nodes. It is a tested workaround,
-not a root-cause fix for RAM retention, and does not validate cached-model reuse
-under the failing policies. Follow-up work is to identify the retained allocations
-and test bounded caching without recreating host-wide memory stalls.
+The stress test used `--cache-none` as a diagnostic workaround. Normal service
+configuration now restores default RAM-pressure caching. GGUF loads from its
+persistent `/data/custom_nodes/ComfyUI-GGUF` checkout rather than the image.
+The next investigation is to validate explicit model/node cleanup through
+`POST /free` at workflow boundaries, identify any retained allocations, and
+preserve cache reuse within a workflow. Automatic boundary cleanup is not yet
+implemented; the successful no-cache run does not validate this restored profile.
+After rebuilding and restarting, all 1,040 production nodes registered unchanged,
+both GPUs remained visible, and the service passed its health check. The GGUF
+checkout uses the same `6ea2651` commit as the previous bundled provider.
 
 Temporary probes were removed and the original production node registry restored.
 Prompts, histories, finite checks, sampled GPU/host memory, watchdog stops,
