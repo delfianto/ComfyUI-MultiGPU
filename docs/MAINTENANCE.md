@@ -1,11 +1,6 @@
-# Personal fork maintenance
+# Maintenance
 
 [Main README](../README.md) · [Upstream usage guide](README.md)
-
-This checkout belongs to https://github.com/delfianto/ComfyUI-MultiGPU.
-The original project is archived; preserve its GPL-3.0 license and attribution.
-The original registry PublisherId remains historical metadata, not a claim that
-this fork can publish releases under the original maintainer's identity.
 
 ## Hardware and runtime
 
@@ -24,13 +19,19 @@ This is the local machine used for the generation tests below:
 | ComfyUI | 0.39.0 |
 | comfy-kitchen / comfy-aimdo | 0.2.37 / 0.5.6 |
 
+**I use Linux. I do not have a Windows machine and have no interest in maintaining
+one. A `fixed` issue means the fix is validated, or the failure does not reproduce
+in the documented tests, on this machine running my
+[ComfyUI Docker image and Compose setup](https://github.com/delfianto/compose/tree/main/ai/comfyui)
+(`ghcr.io/delfianto/comfyui-nvidia-cuda`).**
+
 Diffusion normally runs on the RTX 4080; CLIP and VAE run on the RTX 3060.
 DisTorch2 can also borrow model storage from the 3060. These cards have no usable
 CUDA peer-access path in this setup, so transfer overhead matters.
 
 ## Tested model configurations
 
-These are completed generation tests, not a list of everything installed:
+Completed generation tests:
 
 | Configuration | Models and components | Test and result |
 | --- | --- | --- |
@@ -38,10 +39,7 @@ These are completed generation tests, not a list of everything installed:
 | FLUX.1-dev FP8 + DisTorch2 + DyPE | `flux1-dev-fp8.safetensors`; `clip-l.safetensors` + `t5xxl-fp8-e4m3fn-scaled.safetensors`; `ae.safetensors` | 512×512, 2-step generation passed; measured donor placement was 4080.60 MiB on the 3060, with 7674.75 MiB on the 4080. |
 | Wan Animate 2 distilled INT8 ConvRot | `wan-animate-2-distill-int8-convrot.safetensors`; `umt5-xxl-fp8-e4m3fn-scaled.safetensors`; `clip-vision-h.safetensors`; `wan-v2.1-vae-bf16.safetensors` | 480×832, 10 steps: 49 frames passed with CPU/default and GPU/int8 cache; 81 frames passed with CPU/default cache. See the cache validation below for OOM cases and limits. |
 
-CLIP/VAE used `cuda:1` in these configurations. The FLUX test confirms execution
-and donor placement; a 2-step smoke test does not establish final image quality.
-Qwen Image 2.1, other checkpoints, Windows hardware, and optional video providers
-have not been validated by these generation runs.
+A 2-step smoke test checks execution, not final image quality.
 
 ## Development checks
 
@@ -56,15 +54,15 @@ basedpyright -p pyproject.toml --warnings
 python -m unittest discover -s tests -v
 ```
 
-The dev group supplies lint/type tools; install Torch separately or use the host
-application's environment. Ruff checks imports, undefined names, common errors,
-bugbear and Python modernization. basedpyright uses basic mode across the Python
-codebase, keeping argument, return, optional-value and attribute checks enabled.
-Missing host/optional-provider imports are permitted. [typings/nodes.pyi](../typings/nodes.pyi) describes
-the core registry so the local `nodes.py` is not mistaken for ComfyUI's module.
-Dynamic logger methods use an explicit Any boundary; errors are not globally
-suppressed. The classmethod receiver naming rule is disabled for wrapper classes
-that capture a different class in their closure.
+The dev group supplies Ruff and basedpyright; install Torch separately or use
+ComfyUI's environment. Ruff checks imports, common errors, bugbear, and Python
+modernization. basedpyright uses basic mode with unused-variable,
+unused-parameter, and deprecated-API warnings enabled. Host and optional-provider
+imports may be absent; [typings/nodes.pyi](../typings/nodes.pyi) supplies the core
+registry contract. Dynamic logger methods use an explicit `Any` boundary.
+
+As of 2026-10-10, all **37 regression tests** pass on the host and in the
+production container. Ruff, formatting, basedpyright, and GitHub CI pass.
 
 ## Upstream triage
 
@@ -73,28 +71,16 @@ identifies proposed PRs, not validated fixes. Reviewed on 2026-10-10.
 Severity is this fork's assessment; upstream does not assign severity labels.
 An open upstream report does not establish that the current fork reproduces it.
 
-**WINDOWS IS UNTESTED AND OUTSIDE THIS PERSONAL FORK'S MAINTENANCE SCOPE.
-I do not have a Windows machine and have no plans to obtain one or validate
-Windows-specific behavior. This tracker applies to my Linux RTX 4080 + RTX 3060
-machine and the runtime versions documented above. An issue is marked `fixed`
-here when its local fix is validated or the affected path passes without
-reproducing the reported failure on this machine. That status does not establish
-that the upstream Windows report is resolved or promise Windows support.**
-
-Status describes this fork on this machine: `fixed` means locally addressed or
-not reproduced by the documented checks; `partial` means local coverage or
-validation is incomplete; `open` means no validated local fix is available.
-Untested models/providers remain `partial` or `open`; absence of a test alone
-does not count as failure to reproduce. The table tracks implemented changes
-and remaining work together.
+`partial` means changes exist but validation is incomplete; `open` means no
+validated fix is available. Untested models/providers remain in those states.
 
 | Priority | Reports | Status | Problem | Fix and validation | Next step |
 | --- | --- | --- | --- | --- | --- |
-| Critical | [#187](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/187), [#210](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/210), [#218](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/218), [#220](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/220); [PR #216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216) | fixed | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve versioned Linux and Windows runtimes; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. | - |
+| Critical | [#187](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/187), [#210](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/210), [#218](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/218), [#220](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/220); [PR #216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216) | fixed | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve CUDA runtime libraries; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. | - |
 | Critical | [#211](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/211), [#213](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/213), [#222](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/222) | fixed | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep comfy-kitchen >=0.2.35 native exports. Older versions retain the compatibility patch and are unvalidated here. | - |
 | Critical | Local FP8 CLIP crash; [#189](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/189) related symptoms | fixed | CLIP/VAE inference can execute under the wrong current device. | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device; restore state on exceptions. CPU regressions and local dual-GPU generation pass. | - |
-| Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | fixed | Windows DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | - |
-| Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | fixed | WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback on Windows/kitchen 0.2.31. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. No targeted fix for the original native crash is established. See [validation](#wananimate-cache-validation-2026-10-10). | - |
+| Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | fixed | DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | - |
+| Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | fixed | With kitchen 0.2.31, WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. See [validation](#wananimate-cache-validation-2026-10-10). | - |
 | Critical | [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212) | open | A GPU reportedly disappears during MiniMax H3 generation on four RTX 3090s; cause is uncertain. | No targeted fix established. Cross-device fixes may be related, but current evidence cannot establish causation or resolution. | Obtain a reproducible graph, driver/Xid logs, and comparisons with core device-selection nodes on the affected hardware. |
 | High | Local code finding: older GGUF wrappers | open | Provider calls occur before device-restoration try/finally; failures can leave global device state changed. | No fix yet. This is a confirmed code finding, not an established cause of a specific upstream report. | Protect the entire operation in src/wrappers.py; test restoration after provider and result-processing failures. **Next implementation item.** |
 | High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | open | Async/await errors prevent generation; wrappers assume synchronous results. | No fix yet; the report lacks a precise reproducer, so its cause remains unconfirmed. | Identify the affected provider/version; preserve its execution contract and device guards through completion, failure, and cancellation. Test synchronous and async providers. |
@@ -107,16 +93,12 @@ and remaining work together.
 | Medium | [PR #217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217) | partial | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. The alternative provider is not installed locally. | Validate loading with the alternative provider. |
 | Medium | [PR #182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182) | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | - |
 
-Suggested implementation order: exception-safe GGUF wrappers, async provider
-compatibility, then mixed-quantization MiniMax validation. Repeated-run CLIP
-validation is complete for the configurations documented below. Windows-specific confirmation is outside this fork's maintenance
-scope. The GPU-disappearance report still needs evidence from its affected
-hardware. Local WanAnimate validation is documented below; its original
-Windows native crash remains untested.
+Next: exception-safe GGUF wrappers, async provider compatibility, then
+mixed-quantization MiniMax validation. The GPU-disappearance report still needs
+a reproducible graph and driver logs from the affected hardware.
 
-WanVideo/LTX feature requests are outside this crash-fix tracker. LTXV2 [PR #164](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/164)
-has not been merged. This fork does not claim to resolve all upstream issues;
-this is a personal maintenance backlog, not a support or delivery promise.
+WanVideo/LTX feature requests are outside this crash-fix tracker;
+[LTXV2 PR #164](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/164) is not merged.
 
 ## Source layout
 
@@ -135,57 +117,26 @@ them there:
 - `prestartup_script.py` executes `src/prestartup_script.py` directly. It avoids
   importing the runtime package or Torch before core configures CUDA visibility.
 
-Serialized node names and workflow loader names are unchanged.
+## Deployment and initial validation (2026-10-10)
 
-## Deployment
+The service bind-mounts this checkout at `/data/custom_nodes/ComfyUI-MultiGPU`.
+Apply Python edits with `composectl restart ai-comfyui --json`; rebuilding the
+image is unnecessary. GGUF is bundled in the image; MultiGPU loads from the
+persistent checkout. Keep serialized node names compatible with existing flows.
+The registry PublisherId is retained as historical metadata.
 
-The service bind-mounts this directory at `/data/custom_nodes/ComfyUI-MultiGPU`.
-Python changes require `composectl restart ai-comfyui --json`; image rebuilding is
-unnecessary for node edits. The Docker image owns GGUF only. Preserve serialized
-node names so existing workflows remain compatible. Model runs use RTX 4080
-(cuda:0), with CLIP/VAE on RTX 3060 (cuda:1) wherever practical.
+Initial deployment used image `78549b8cbea2`. Both GPUs had initialized aimdo
+contexts and modern DLPack exports stayed native. After moving runtime code into
+`src/`, all 44 MultiGPU node names, schemas, outputs, and categories matched the
+previous registration; in-app documentation returned HTTP 200. A fresh Krea2 +
+LoRA + DyPE smoke generation completed in 8.65 seconds.
 
-Reviewed proposals: [#216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216),
-[#198](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/198),
-[#200](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/200),
-[#195](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/195),
-[#182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182), and
-[#217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217).
-The P2P, Florence2, and schema-copy proposals were adapted; memory accounting and
-prestartup initialization were implemented with additional local safeguards.
-
-## Local validation (2026-10-10)
-
-Rebuilt image `78549b8cbea2`, ComfyUI 0.39.0, Torch 2.11.0+cu130,
-comfy-kitchen 0.2.37, comfy-aimdo 0.5.6. Service restarted through composectl;
-Docker health is healthy. MultiGPU loads only from the persistent checkout.
-Both GPUs have initialized aimdo contexts, and modern DLPack is unpatched.
-
-- Ruff check and format check pass; basedpyright reports zero errors/warnings.
-- All 22 CPU regressions pass both on the host and inside the container.
-- FLUX.1-dev FP8 + DyPE, 512x512, 2 steps: succeeds. Actual layer assignment
-  places 4080.60 MiB on cuda:1 and 7674.75 MiB on cuda:0. CLIP/VAE use cuda:1.
-- Krea2 RAW FP8 + Karina LoRA 0.9 + DyPE, 896x1200, 25 steps: succeeds in
-  68.14 seconds after switching from FLUX; inspected output is a valid portrait.
-- The FLUX workflow now uses a diffusion loader plus separate CLIP-L/T5 and ae
-  VAE loaders. Its previous checkpoint loader referenced a diffusion-only file.
-
-Prompts, history, validation results, and the portrait are saved under
+The FLUX workflow's checkpoint loader was replaced with separate diffusion,
+CLIP-L/T5, and VAE loaders because the model file contains diffusion weights only.
+LTX helper loaders now forward `config` instead of discarding it. Full Krea2 and
+FLUX generation results are in the model table above. Migration prompts,
+histories, and outputs are under
 `/srv/appdata/comfyui/user/default/workflow-backups/multigpu-fork-migration/`.
-These initial runs cover the installed image models, not every optional video
-provider. Native WanAnimate coverage was added separately below.
-
-Editor diagnostic cleanup: CLI/CI now enable unused-variable, unused-parameter,
-and deprecated-API warnings, matching the tagged hints exposed by Zed. Intentional
-compatibility parameters retain their public keyword names. LTX helper loaders
-now forward config instead of discarding it, covered by a regression test.
-
-After the src/ reorganization, ComfyUI was restarted and all 44 MultiGPU node
-names, schemas, outputs and categories matched the previous registration. The
-root web documentation route returned HTTP 200. All 22 regression tests passed
-on the host and in the container; Ruff/basedpyright and the editor language server
-were clean. A fresh 512×512 Krea2 + LoRA + DyPE smoke generation completed in
-8.65 seconds with the model on cuda:0 and CLIP/VAE on cuda:1.
 
 ## WanAnimate cache validation (2026-10-10)
 
@@ -225,10 +176,8 @@ comparison from one seed, not a general quality or performance benchmark.
 
 ComfyUI remained responsive after each OOM. A fresh-seed 192×320, 17-frame,
 two-step GPU/int8 run then passed in 9.17 s without restarting the service.
-No silent process death or CUDA illegal-address failure was observed. The
-original report used Windows, Blackwell GPUs, kitchen 0.2.31, and DynamicVRAM
-disabled, so this does not establish that its original reproduction is fixed.
-No additional runtime patch was made from these results.
+No process death or CUDA illegal-address failure was observed, and no additional
+runtime patch was needed.
 
 For this hardware, use GPU/int8 cache at the tested 49-frame size and
 CPU/default cache at 81 frames. The three passing API prompts and setup
@@ -262,9 +211,8 @@ through all of ComfyUI's other operations.
 Seven added CPU tests cover a chain deeper than Python's recursion limit,
 parent classification and dtype movement, shared/tied parameters, walker back
 references, idempotence, native delegation, and older-core compatibility.
-All 29 tests pass in both the Python 3.12 CPU environment and the production
-container. Ruff and basedpyright pass without warnings. A representative model's
-fallback load list matches the installed core's dynamic load list.
+A representative model's fallback load list matches the installed core's
+dynamic load list.
 
 After restarting the idle service, all registered node IDs and input schemas
 remain unchanged. A fresh Wan Animate INT8 ConvRot test used
@@ -274,13 +222,6 @@ completed successfully, and the saved animation contains 17 nonblank frames.
 Startup and generation logs confirm the guard was installed before any loader
 ran and was used for the empty-allocation text encoder. Models were unloaded
 afterward and the service remained healthy with an empty queue.
-
-These results validate the registration gap and fallback behavior on Linux.
-They do not reproduce or establish resolution of #184's Windows native C-stack
-failure, nor validate its ZImage checkpoint or every ComfyUI version. The tracker
-marks this fixed for the tested local paths. Windows is **UNTESTED** and outside
-this personal fork's maintenance scope; Windows confirmation is not pending
-maintenance work.
 
 ## Repeated CLIP validation (2026-10-10)
 
@@ -351,16 +292,14 @@ GPU 0 after every encoding call.
 Seven added CPU regressions cover core/delegated loading, empty and explicit
 allocations, annotated attached models, legacy provider fallback, shared patch
 references, exception propagation, standard CLIP loader failure restoration,
-and per-instance encoder device selection. The complete suite has 37 tests,
-including a separate CUDA-runtime candidate test for missing `torch.__file__`.
-Zed type warnings were corrected by annotating `_coerce_torch_device` as
+and per-instance encoder device selection. A separate CUDA-runtime
+candidate test covers missing `torch.__file__`. Zed type warnings were corrected
+by annotating `_coerce_torch_device` as
 `torch.device | None` and checking `torch.__file__` before `dirname`.
 
-The tracker marks #185 `fixed` for this machine under the local status policy.
-These tests validate the installed mixed-FP8 encoder, standard/DisTorch2
-loading, repeated encoding, and forced eviction. The original two-GGUF variant
-was not tested: its Chroma T5 GGUF and Qwen3-8B Q8_0 files are not installed.
-Different core/runtime versions and checkpoints remain outside these results.
+The two-GGUF variant was not tested: Chroma T5 GGUF and Qwen3-8B Q8_0 files
+are not installed.
+
 The temporary probe nodes were removed after testing; diagnostic prompts,
 reference tensors, metrics, histories, and images remain in local test backups.
 After probe removal, a fresh 512×512, 2-step FLUX.1 DisTorch2 generation with

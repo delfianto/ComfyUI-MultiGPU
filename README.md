@@ -4,10 +4,6 @@ This is my **personal fork** of the archived
 [pollockjj/ComfyUI-MultiGPU](https://github.com/pollockjj/ComfyUI-MultiGPU),
 maintained for my own ComfyUI setup.
 
-**DISCLAIMER: I am NOT BY ANY MEANS a Python guru or GPU kernel hacker. Most fixes
-were made with an LLM assistant (GPT-6.1 Sol). This works on my machine; support
-for other setups or checkpoints is outside scope.**
-
 ## What this does
 
 Adds device selection to ComfyUI loaders so diffusion, CLIP/text encoders, and
@@ -16,6 +12,10 @@ GPU or in system RAM to free VRAM on the compute GPU. Workflow steps still run
 in sequence.
 
 ## Use and support
+
+**DISCLAIMER: I am NOT BY ANY MEANS a Python guru or GPU kernel hacker. Most fixes
+were made with an LLM assistant (GPT-6.1 Sol). This works on my machine; support
+for other setups or checkpoints is outside scope.**
 
 I run ComfyUI on CachyOS Linux with rootless Docker: an **RTX 4080 16 GB** for
 diffusion and an **RTX 3060 12 GB** for CLIP/VAE and donor storage.
