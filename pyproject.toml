@@ -11,7 +11,7 @@ Repository = "https://github.com/delfianto/ComfyUI-MultiGPU"
 [tool.comfy]
 PublisherId = "pollockjj"
 DisplayName = "ComfyUI-MultiGPU"
-Icon = "https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/multigpu_icon.png"
+Icon = "https://raw.githubusercontent.com/delfianto/ComfyUI-MultiGPU/main/docs/assets/multigpu_icon.png"
 
 [dependency-groups]
 dev = ["ruff>=0.17,<0.18", "basedpyright>=1.39,<2", "packaging>=24"]

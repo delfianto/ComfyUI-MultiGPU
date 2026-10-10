@@ -8,7 +8,7 @@ archived; this personal fork is maintained for my own setup. Read the
 [maintenance notes](MAINTENANCE.md) for tested configurations and changes.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/distorch_average.png" width="600">
+  <img src="assets/distorch_average.png" width="600">
   <br>
   <em>Free almost all of your GPU for what matters: Maximum latent space processing</em>
 </p>
@@ -24,7 +24,7 @@ archived; this personal fork is maintained for my own setup. Read the
 <h1 align="center">DisTorch: How It Works</h1>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/distorch2_0.gif" width="800">
+  <img src="assets/distorch2_0.gif" width="800">
   <br>
   <em>DisTorch 2.0 in Action</em>
 </p>
@@ -52,7 +52,7 @@ What is DisTorch? Standing for "distributed torch", the DisTorch nodes in this c
 - Allows **you** to easily shift from ___on-device speed___ to ___open-device latent space capability___ with a simple one-number change
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/distorch_node.png" width="400">
+  <img src="assets/distorch_node.png" width="400">
   <br>
   <em>DisTorch Nodes with one simple number to tune its Virtual VRAM to your needs</em>
 </p>
@@ -70,7 +70,7 @@ DisTorch2 models use the legacy patcher for donor allocation. See
 ⚙️ Expert users: Like .gguf or exl2/3 LLM loaders, use the expert_mode_allocations for exact allocations of model shards on as many devices as your setup has!
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/pollockjj/ComfyUI-MultiGPU/main/assets/distorch2_0.png" width="300">
+  <img src="assets/distorch2_0.png" width="300">
   <br>
   <em>The new Virtual VRAM even lets you offload ALL of the model and still run compute on your CUDA device!</em>
 </p>
@@ -87,63 +87,63 @@ The extension automatically creates MultiGPU versions of loader nodes. Each Mult
 Currently supported nodes (automatically detected if available):
 
 - Standard [ComfyUI](https://github.com/comfyanonymous/ComfyUI) model loaders:
-  - [CheckpointLoaderAdvancedMultiGPU](./CheckpointLoaderAdvancedMultiGPU.md) / [CheckpointLoaderAdvancedDisTorch2MultiGPU](./CheckpointLoaderAdvancedDisTorch2MultiGPU.md)
-  - [CheckpointLoaderSimpleMultiGPU](./CheckpointLoaderSimpleMultiGPU.md) / [CheckpointLoaderSimpleDisTorch2MultiGPU](./CheckpointLoaderSimpleDisTorch2MultiGPU.md)
-  - [UNETLoaderMultiGPU](./UNETLoaderMultiGPU.md) / [UNETLoaderDisTorch2MultiGPU](./UNETLoaderDisTorch2MultiGPU.md)
-  - [UNetLoaderLP](./UNetLoaderLP.md)
-  - [VAELoaderMultiGPU](./VAELoaderMultiGPU.md) / [VAELoaderDisTorch2MultiGPU](./VAELoaderDisTorch2MultiGPU.md)
-  - [CLIPLoaderMultiGPU](./CLIPLoaderMultiGPU.md) / [CLIPLoaderDisTorch2MultiGPU](./CLIPLoaderDisTorch2MultiGPU.md)
-  - [DualCLIPLoaderMultiGPU](./DualCLIPLoaderMultiGPU.md) / [DualCLIPLoaderDisTorch2MultiGPU](./DualCLIPLoaderDisTorch2MultiGPU.md)
-  - [TripleCLIPLoaderMultiGPU](./TripleCLIPLoaderMultiGPU.md) / [TripleCLIPLoaderDisTorch2MultiGPU](./TripleCLIPLoaderDisTorch2MultiGPU.md)
-  - [QuadrupleCLIPLoaderMultiGPU](./QuadrupleCLIPLoaderMultiGPU.md) / [QuadrupleCLIPLoaderDisTorch2MultiGPU](./QuadrupleCLIPLoaderDisTorch2MultiGPU.md)
-  - [CLIPVisionLoaderMultiGPU](./CLIPVisionLoaderMultiGPU.md) / [CLIPVisionLoaderDisTorch2MultiGPU](./CLIPVisionLoaderDisTorch2MultiGPU.md)
-  - [ControlNetLoaderMultiGPU](./ControlNetLoaderMultiGPU.md) / [ControlNetLoaderDisTorch2MultiGPU](./ControlNetLoaderDisTorch2MultiGPU.md)
-  - [DiffusersLoaderMultiGPU](./DiffusersLoaderMultiGPU.md) / [DiffusersLoaderDisTorch2MultiGPU](./DiffusersLoaderDisTorch2MultiGPU.md)
-  - [DiffControlNetLoaderMultiGPU](./DiffControlNetLoaderMultiGPU.md) / [DiffControlNetLoaderDisTorch2MultiGPU](./DiffControlNetLoaderDisTorch2MultiGPU.md)
+  - [CheckpointLoaderAdvancedMultiGPU](web/docs/CheckpointLoaderAdvancedMultiGPU.md) / [CheckpointLoaderAdvancedDisTorch2MultiGPU](web/docs/CheckpointLoaderAdvancedDisTorch2MultiGPU.md)
+  - [CheckpointLoaderSimpleMultiGPU](web/docs/CheckpointLoaderSimpleMultiGPU.md) / [CheckpointLoaderSimpleDisTorch2MultiGPU](web/docs/CheckpointLoaderSimpleDisTorch2MultiGPU.md)
+  - [UNETLoaderMultiGPU](web/docs/UNETLoaderMultiGPU.md) / [UNETLoaderDisTorch2MultiGPU](web/docs/UNETLoaderDisTorch2MultiGPU.md)
+  - [UNetLoaderLP](web/docs/UNetLoaderLP.md)
+  - [VAELoaderMultiGPU](web/docs/VAELoaderMultiGPU.md) / [VAELoaderDisTorch2MultiGPU](web/docs/VAELoaderDisTorch2MultiGPU.md)
+  - [CLIPLoaderMultiGPU](web/docs/CLIPLoaderMultiGPU.md) / [CLIPLoaderDisTorch2MultiGPU](web/docs/CLIPLoaderDisTorch2MultiGPU.md)
+  - [DualCLIPLoaderMultiGPU](web/docs/DualCLIPLoaderMultiGPU.md) / [DualCLIPLoaderDisTorch2MultiGPU](web/docs/DualCLIPLoaderDisTorch2MultiGPU.md)
+  - [TripleCLIPLoaderMultiGPU](web/docs/TripleCLIPLoaderMultiGPU.md) / [TripleCLIPLoaderDisTorch2MultiGPU](web/docs/TripleCLIPLoaderDisTorch2MultiGPU.md)
+  - [QuadrupleCLIPLoaderMultiGPU](web/docs/QuadrupleCLIPLoaderMultiGPU.md) / [QuadrupleCLIPLoaderDisTorch2MultiGPU](web/docs/QuadrupleCLIPLoaderDisTorch2MultiGPU.md)
+  - [CLIPVisionLoaderMultiGPU](web/docs/CLIPVisionLoaderMultiGPU.md) / [CLIPVisionLoaderDisTorch2MultiGPU](web/docs/CLIPVisionLoaderDisTorch2MultiGPU.md)
+  - [ControlNetLoaderMultiGPU](web/docs/ControlNetLoaderMultiGPU.md) / [ControlNetLoaderDisTorch2MultiGPU](web/docs/ControlNetLoaderDisTorch2MultiGPU.md)
+  - [DiffusersLoaderMultiGPU](web/docs/DiffusersLoaderMultiGPU.md) / [DiffusersLoaderDisTorch2MultiGPU](web/docs/DiffusersLoaderDisTorch2MultiGPU.md)
+  - [DiffControlNetLoaderMultiGPU](web/docs/DiffControlNetLoaderMultiGPU.md) / [DiffControlNetLoaderDisTorch2MultiGPU](web/docs/DiffControlNetLoaderDisTorch2MultiGPU.md)
 - WanVideoWrapper (requires [ComfyUI-WanVideoWrapper](https://github.com/kijai/ComfyUI-WanVideoWrapper)):
-  - [WanVideoModelLoaderMultiGPU](./WanVideoModelLoaderMultiGPU.md)
-  - [WanVideoVAELoaderMultiGPU](./WanVideoVAELoaderMultiGPU.md)
-  - [WanVideoTinyVAELoaderMultiGPU](./WanVideoTinyVAELoaderMultiGPU.md)
-  - [WanVideoBlockSwapMultiGPU](./WanVideoBlockSwapMultiGPU.md)
-  - [WanVideoImageToVideoEncodeMultiGPU](./WanVideoImageToVideoEncodeMultiGPU.md)
-  - [WanVideoEncodeMultiGPU](./WanVideoEncodeMultiGPU.md)
-  - [WanVideoDecodeMultiGPU](./WanVideoDecodeMultiGPU.md)
-  - [WanVideoSamplerMultiGPU](./WanVideoSamplerMultiGPU.md)
-  - [WanVideoVACEEncodeMultiGPU](./WanVideoVACEEncodeMultiGPU.md)
-  - [WanVideoClipVisionEncodeMultiGPU](./WanVideoClipVisionEncodeMultiGPU.md)
-  - [WanVideoControlnetLoaderMultiGPU](./WanVideoControlnetLoaderMultiGPU.md)
-  - [WanVideoUni3C_ControlnetLoaderMultiGPU](./WanVideoUni3C_ControlnetLoaderMultiGPU.md)
-  - [WanVideoTextEncodeMultiGPU](./WanVideoTextEncodeMultiGPU.md)
-  - [WanVideoTextEncodeCachedMultiGPU](./WanVideoTextEncodeCachedMultiGPU.md)
-  - [WanVideoTextEncodeSingleMultiGPU](./WanVideoTextEncodeSingleMultiGPU.md)
-  - [LoadWanVideoT5TextEncoderMultiGPU](./LoadWanVideoT5TextEncoderMultiGPU.md)
-  - [LoadWanVideoClipTextEncoderMultiGPU](./LoadWanVideoClipTextEncoderMultiGPU.md)
-  - [FantasyTalkingModelLoaderMultiGPU](./FantasyTalkingModelLoaderMultiGPU.md)
-  - [Wav2VecModelLoaderMultiGPU](./Wav2VecModelLoaderMultiGPU.md) / [DownloadAndLoadWav2VecModelMultiGPU](./DownloadAndLoadWav2VecModelMultiGPU.md)
+  - [WanVideoModelLoaderMultiGPU](web/docs/WanVideoModelLoaderMultiGPU.md)
+  - [WanVideoVAELoaderMultiGPU](web/docs/WanVideoVAELoaderMultiGPU.md)
+  - [WanVideoTinyVAELoaderMultiGPU](web/docs/WanVideoTinyVAELoaderMultiGPU.md)
+  - [WanVideoBlockSwapMultiGPU](web/docs/WanVideoBlockSwapMultiGPU.md)
+  - [WanVideoImageToVideoEncodeMultiGPU](web/docs/WanVideoImageToVideoEncodeMultiGPU.md)
+  - [WanVideoEncodeMultiGPU](web/docs/WanVideoEncodeMultiGPU.md)
+  - [WanVideoDecodeMultiGPU](web/docs/WanVideoDecodeMultiGPU.md)
+  - [WanVideoSamplerMultiGPU](web/docs/WanVideoSamplerMultiGPU.md)
+  - [WanVideoVACEEncodeMultiGPU](web/docs/WanVideoVACEEncodeMultiGPU.md)
+  - [WanVideoClipVisionEncodeMultiGPU](web/docs/WanVideoClipVisionEncodeMultiGPU.md)
+  - [WanVideoControlnetLoaderMultiGPU](web/docs/WanVideoControlnetLoaderMultiGPU.md)
+  - [WanVideoUni3C_ControlnetLoaderMultiGPU](web/docs/WanVideoUni3C_ControlnetLoaderMultiGPU.md)
+  - [WanVideoTextEncodeMultiGPU](web/docs/WanVideoTextEncodeMultiGPU.md)
+  - [WanVideoTextEncodeCachedMultiGPU](web/docs/WanVideoTextEncodeCachedMultiGPU.md)
+  - [WanVideoTextEncodeSingleMultiGPU](web/docs/WanVideoTextEncodeSingleMultiGPU.md)
+  - [LoadWanVideoT5TextEncoderMultiGPU](web/docs/LoadWanVideoT5TextEncoderMultiGPU.md)
+  - [LoadWanVideoClipTextEncoderMultiGPU](web/docs/LoadWanVideoClipTextEncoderMultiGPU.md)
+  - [FantasyTalkingModelLoaderMultiGPU](web/docs/FantasyTalkingModelLoaderMultiGPU.md)
+  - [Wav2VecModelLoaderMultiGPU](web/docs/Wav2VecModelLoaderMultiGPU.md) / [DownloadAndLoadWav2VecModelMultiGPU](web/docs/DownloadAndLoadWav2VecModelMultiGPU.md)
 - GGUF loaders (requires [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)):
-  - UNet family: [UnetLoaderGGUFMultiGPU](./UnetLoaderGGUFMultiGPU.md) / [UnetLoaderGGUFDisTorch2MultiGPU](./UnetLoaderGGUFDisTorch2MultiGPU.md)
-  - UNet Advanced bundles: [UnetLoaderGGUFAdvancedMultiGPU](./UnetLoaderGGUFAdvancedMultiGPU.md) / [UnetLoaderGGUFAdvancedDisTorch2MultiGPU](./UnetLoaderGGUFAdvancedDisTorch2MultiGPU.md)
-  - CLIP family: [CLIPLoaderGGUFMultiGPU](./CLIPLoaderGGUFMultiGPU.md) / [CLIPLoaderGGUFDisTorch2MultiGPU](./CLIPLoaderGGUFDisTorch2MultiGPU.md)
-  - Dual CLIP: [DualCLIPLoaderGGUFMultiGPU](./DualCLIPLoaderGGUFMultiGPU.md) / [DualCLIPLoaderGGUFDisTorch2MultiGPU](./DualCLIPLoaderGGUFDisTorch2MultiGPU.md)
-  - Triple CLIP: [TripleCLIPLoaderGGUFMultiGPU](./TripleCLIPLoaderGGUFMultiGPU.md) / [TripleCLIPLoaderGGUFDisTorch2MultiGPU](./TripleCLIPLoaderGGUFDisTorch2MultiGPU.md)
-  - Quadruple CLIP: [QuadrupleCLIPLoaderGGUFMultiGPU](./QuadrupleCLIPLoaderGGUFMultiGPU.md) / [QuadrupleCLIPLoaderGGUFDisTorch2MultiGPU](./QuadrupleCLIPLoaderGGUFDisTorch2MultiGPU.md)
+  - UNet family: [UnetLoaderGGUFMultiGPU](web/docs/UnetLoaderGGUFMultiGPU.md) / [UnetLoaderGGUFDisTorch2MultiGPU](web/docs/UnetLoaderGGUFDisTorch2MultiGPU.md)
+  - UNet Advanced bundles: [UnetLoaderGGUFAdvancedMultiGPU](web/docs/UnetLoaderGGUFAdvancedMultiGPU.md) / [UnetLoaderGGUFAdvancedDisTorch2MultiGPU](web/docs/UnetLoaderGGUFAdvancedDisTorch2MultiGPU.md)
+  - CLIP family: [CLIPLoaderGGUFMultiGPU](web/docs/CLIPLoaderGGUFMultiGPU.md) / [CLIPLoaderGGUFDisTorch2MultiGPU](web/docs/CLIPLoaderGGUFDisTorch2MultiGPU.md)
+  - Dual CLIP: [DualCLIPLoaderGGUFMultiGPU](web/docs/DualCLIPLoaderGGUFMultiGPU.md) / [DualCLIPLoaderGGUFDisTorch2MultiGPU](web/docs/DualCLIPLoaderGGUFDisTorch2MultiGPU.md)
+  - Triple CLIP: [TripleCLIPLoaderGGUFMultiGPU](web/docs/TripleCLIPLoaderGGUFMultiGPU.md) / [TripleCLIPLoaderGGUFDisTorch2MultiGPU](web/docs/TripleCLIPLoaderGGUFDisTorch2MultiGPU.md)
+  - Quadruple CLIP: [QuadrupleCLIPLoaderGGUFMultiGPU](web/docs/QuadrupleCLIPLoaderGGUFMultiGPU.md) / [QuadrupleCLIPLoaderGGUFDisTorch2MultiGPU](web/docs/QuadrupleCLIPLoaderGGUFDisTorch2MultiGPU.md)
 - XLabAI FLUX ControlNet (requires [x-flux-comfy](https://github.com/XLabAI/x-flux-comfyui)):
-  - [LoadFluxControlNetMultiGPU](./LoadFluxControlNetMultiGPU.md)
+  - [LoadFluxControlNetMultiGPU](web/docs/LoadFluxControlNetMultiGPU.md)
 - Florence2 (requires [ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2)):
-  - [Florence2ModelLoaderMultiGPU](./Florence2ModelLoaderMultiGPU.md)
-  - [DownloadAndLoadFlorence2ModelMultiGPU](./DownloadAndLoadFlorence2ModelMultiGPU.md)
+  - [Florence2ModelLoaderMultiGPU](web/docs/Florence2ModelLoaderMultiGPU.md)
+  - [DownloadAndLoadFlorence2ModelMultiGPU](web/docs/DownloadAndLoadFlorence2ModelMultiGPU.md)
 - LTX Video Custom Checkpoint Loader (requires [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo)):
-  - [LTXVLoaderMultiGPU](./LTXVLoaderMultiGPU.md)
+  - [LTXVLoaderMultiGPU](web/docs/LTXVLoaderMultiGPU.md)
 - NF4 Checkpoint Format Loader (requires [ComfyUI_bitsandbytes_NF4](https://github.com/comfyanonymous/ComfyUI_bitsandbytes_NF4)):
-  - [CheckpointLoaderNF4MultiGPU](./CheckpointLoaderNF4MultiGPU.md)
+  - [CheckpointLoaderNF4MultiGPU](web/docs/CheckpointLoaderNF4MultiGPU.md)
 - MMAudio (requires [ComfyUI-MMAudio](https://github.com/comfyanonymous/ComfyUI-MMAudio)):
-  - [MMAudioModelLoaderMultiGPU](./MMAudioModelLoaderMultiGPU.md)
-  - [MMAudioFeatureUtilsLoaderMultiGPU](./MMAudioFeatureUtilsLoaderMultiGPU.md)
-  - [MMAudioSamplerMultiGPU](./MMAudioSamplerMultiGPU.md)
+  - [MMAudioModelLoaderMultiGPU](web/docs/MMAudioModelLoaderMultiGPU.md)
+  - [MMAudioFeatureUtilsLoaderMultiGPU](web/docs/MMAudioFeatureUtilsLoaderMultiGPU.md)
+  - [MMAudioSamplerMultiGPU](web/docs/MMAudioSamplerMultiGPU.md)
 - Pulid (requires [PuLID_ComfyUI](https://github.com/cubiq/PuLID_ComfyUI)):
-  - [PulidModelLoaderMultiGPU](./PulidModelLoaderMultiGPU.md)
-  - [PulidInsightFaceLoaderMultiGPU](./PulidInsightFaceLoaderMultiGPU.md)
-  - [PulidEvaClipLoaderMultiGPU](./PulidEvaClipLoaderMultiGPU.md)
+  - [PulidModelLoaderMultiGPU](web/docs/PulidModelLoaderMultiGPU.md)
+  - [PulidInsightFaceLoaderMultiGPU](web/docs/PulidInsightFaceLoaderMultiGPU.md)
+  - [PulidEvaClipLoaderMultiGPU](web/docs/PulidEvaClipLoaderMultiGPU.md)
 
 All MultiGPU nodes available for your install can be found in the "multigpu" category in the node menu.
 

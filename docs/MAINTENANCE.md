@@ -99,9 +99,9 @@ Two small entry files remain at the repository root because ComfyUI discovers
 them there:
 
 - `__init__.py` exposes the node mappings and forwards historical helper
-  attributes to `src`. Its `WEB_DIRECTORY` points to the repository root so
-  ComfyUI can still fetch `docs/<node>.md` for in-app node help. All Markdown
-  documentation now lives in `docs/`; the former `web/` directory is removed.
+  attributes to `src`. Its `WEB_DIRECTORY` points to `docs/web/`, with node
+  help pages in `docs/web/docs/` to preserve ComfyUI's `docs/<node>.md` help
+  route. Documentation assets live in `docs/assets/`.
 - `prestartup_script.py` executes `src/prestartup_script.py` directly. It avoids
   importing the runtime package or Torch before core configures CUDA visibility.
 
