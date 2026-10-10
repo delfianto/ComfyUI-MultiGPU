@@ -73,18 +73,28 @@ identifies proposed PRs, not validated fixes. Reviewed on 2026-10-10.
 Severity is this fork's assessment; upstream does not assign severity labels.
 An open upstream report does not establish that the current fork reproduces it.
 
-Status describes this fork: `fixed` means the targeted defect is addressed and
-validated; `partial` means related changes exist but coverage or the original
-reproduction remains unverified; `open` means no validated fix is available.
-The table tracks implemented changes and remaining work together.
+**WINDOWS IS UNTESTED AND OUTSIDE THIS PERSONAL FORK'S MAINTENANCE SCOPE.
+I do not have a Windows machine and have no plans to obtain one or validate
+Windows-specific behavior. This tracker applies to my Linux RTX 4080 + RTX 3060
+machine and the runtime versions documented above. An issue is marked `fixed`
+here when its local fix is validated or the affected path passes without
+reproducing the reported failure on this machine. That status does not establish
+that the upstream Windows report is resolved or promise Windows support.**
+
+Status describes this fork on this machine: `fixed` means locally addressed or
+not reproduced by the documented checks; `partial` means local coverage or
+validation is incomplete; `open` means no validated local fix is available.
+Untested models/providers remain `partial` or `open`; absence of a test alone
+does not count as failure to reproduce. The table tracks implemented changes
+and remaining work together.
 
 | Priority | Reports | Status | Problem | Fix and validation | Next step |
 | --- | --- | --- | --- | --- | --- |
-| Critical | [#187](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/187), [#210](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/210), [#218](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/218), [#220](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/220); [PR #216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216) | partial | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve versioned Linux and Windows runtimes; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. | Validate runtime execution on Windows hardware. |
-| Critical | [#211](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/211), [#213](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/213), [#222](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/222) | partial | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep comfy-kitchen >=0.2.35 native exports. Older versions retain the compatibility patch and are unvalidated here. | Reproduce affected older-kitchen configurations and inspect tensor lifetime, device, and stream handling. |
-| Critical | Local FP8 CLIP crash; [#189](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/189) related symptoms | partial | CLIP/VAE inference can execute under the wrong current device. | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device; restore state on exceptions. CPU regressions and local dual-GPU generation pass. | Validate the original upstream reproduction; similar symptoms do not establish resolution. Repeated-run [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) is tracked separately below. |
-| Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | partial | Windows DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | Reproduce the native C-stack failure and verify the fix on the original Windows/ZImage setup. |
-| Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | partial | WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback on Windows/kitchen 0.2.31. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. No targeted fix for the original native crash is established. See [validation](#wananimate-cache-validation-2026-10-10). | Reproduce the Windows/older-kitchen case in an isolated process; capture native crash diagnostics and inspect active patches, tensor lifetime, device, and streams. |
+| Critical | [#187](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/187), [#210](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/210), [#218](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/218), [#220](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/220); [PR #216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216) | fixed | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve versioned Linux and Windows runtimes; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. | None locally. Windows runtime execution is **UNTESTED** and outside scope. |
+| Critical | [#211](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/211), [#213](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/213), [#222](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/222) | fixed | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep comfy-kitchen >=0.2.35 native exports. Older versions retain the compatibility patch and are unvalidated here. | None on the documented current runtime. Older-kitchen configurations remain unvalidated; Windows is **UNTESTED** and outside scope. |
+| Critical | Local FP8 CLIP crash; [#189](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/189) related symptoms | fixed | CLIP/VAE inference can execute under the wrong current device. | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device; restore state on exceptions. CPU regressions and local dual-GPU generation pass. | None for the validated local crash. The original upstream reproduction is unverified; Windows is **UNTESTED** and outside scope. Repeated-run [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) is tracked separately below. |
+| Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | fixed | Windows DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | None locally; the tested dynamic loading paths pass. Original Windows/ZImage reproduction is **UNTESTED** and outside scope. |
+| Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | fixed | WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback on Windows/kitchen 0.2.31. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. No targeted fix for the original native crash is established. See [validation](#wananimate-cache-validation-2026-10-10). | None for a process crash on the tested local runtime. Original Windows/older-kitchen case is **UNTESTED** and outside scope; GPU/int8 OOM remains a capacity limitation. |
 | Critical | [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212) | open | A GPU reportedly disappears during MiniMax H3 generation on four RTX 3090s; cause is uncertain. | No targeted fix established. Cross-device fixes may be related, but current evidence cannot establish causation or resolution. | Obtain a reproducible graph, driver/Xid logs, and comparisons with core device-selection nodes on the affected hardware. |
 | High | Local code finding: older GGUF wrappers | open | Provider calls occur before device-restoration try/finally; failures can leave global device state changed. | No fix yet. This is a confirmed code finding, not an established cause of a specific upstream report. | Protect the entire operation in src/wrappers.py; test restoration after provider and result-processing failures. **Next implementation item.** |
 | High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | open | Async/await errors prevent generation; wrappers assume synchronous results. | No fix yet; the report lacks a precise reproducer, so its cause remains unconfirmed. | Identify the affected provider/version; preserve its execution contract and device guards through completion, failure, and cancellation. Test synchronous and async providers. |
@@ -99,9 +109,10 @@ The table tracks implemented changes and remaining work together.
 
 Suggested implementation order: exception-safe GGUF wrappers, async provider
 compatibility, repeated-run CLIP validation, then mixed-quantization MiniMax
-validation. Confirming the remaining Windows crashes and GPU-disappearance
-report requires their specific environments and evidence. The local WanAnimate
-validation is documented below; its original native crash remains unverified.
+validation. Windows-specific confirmation is outside this fork's maintenance
+scope. The GPU-disappearance report still needs evidence from its affected
+hardware. Local WanAnimate validation is documented below; its original
+Windows native crash remains untested.
 
 WanVideo/LTX feature requests are outside this crash-fix tracker. LTXV2 [PR #164](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/164)
 has not been merged. This fork does not claim to resolve all upstream issues;
@@ -266,5 +277,7 @@ afterward and the service remained healthy with an empty queue.
 
 These results validate the registration gap and fallback behavior on Linux.
 They do not reproduce or establish resolution of #184's Windows native C-stack
-failure, nor validate its ZImage checkpoint or every ComfyUI version. Keep the
-TODO open until the original Windows case is tested.
+failure, nor validate its ZImage checkpoint or every ComfyUI version. The tracker
+marks this fixed for the tested local paths. Windows is **UNTESTED** and outside
+this personal fork's maintenance scope; Windows confirmation is not pending
+maintenance work.
