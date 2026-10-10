@@ -61,7 +61,7 @@ unused-parameter, and deprecated-API warnings enabled. Host and optional-provide
 imports may be absent; [typings/nodes.pyi](../typings/nodes.pyi) supplies the core
 registry contract. Dynamic logger methods use an explicit `Any` boundary.
 
-As of 2026-10-10, all **37 regression tests** pass on the host and in the
+As of 2026-10-10, all **41 regression tests** pass on the host and in the
 production container. Ruff, formatting, basedpyright, and GitHub CI pass.
 
 ## Upstream triage
@@ -82,8 +82,8 @@ validated fix is available. Untested models/providers remain in those states.
 | Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | fixed | DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). | - |
 | Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | fixed | With kitchen 0.2.31, WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. See [validation](#wananimate-cache-validation-2026-10-10). | - |
 | Critical | [#212](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/212) | open | A GPU reportedly disappears during MiniMax H3 generation on four RTX 3090s; cause is uncertain. | No targeted fix established. Cross-device fixes may be related, but current evidence cannot establish causation or resolution. | Obtain a reproducible graph, driver/Xid logs, and comparisons with core device-selection nodes on the affected hardware. |
-| High | Local code finding: older GGUF wrappers | open | Provider calls occur before device-restoration try/finally; failures can leave global device state changed. | No fix yet. This is a confirmed code finding, not an established cause of a specific upstream report. | Protect the entire operation in src/wrappers.py; test restoration after provider and result-processing failures. **Next implementation item.** |
-| High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | open | Async/await errors prevent generation; wrappers assume synchronous results. | No fix yet; the report lacks a precise reproducer, so its cause remains unconfirmed. | Identify the affected provider/version; preserve its execution contract and device guards through completion, failure, and cancellation. Test synchronous and async providers. |
+| High | Local code finding: older GGUF wrappers | fixed | Provider calls and result processing could fail before device restoration. | Protect setup, loading, and metadata handling in all four older wrappers. Regressions cover setup/provider/output errors and preserve the previous device. | - |
+| High | [#203](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/203) | fixed | Async/await errors prevent generation; wrappers assumed synchronous providers. | Preserve synchronous/async execution contracts across all loader wrapper families; await before processing results. Restore device and patcher state between async steps, on errors, and on cancellation. Local executor probes pass; the report supplies no exact graph/provider version to replay. See [validation](#loader-execution-validation-2026-10-10). | - |
 | High | [#185](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/185) | fixed | Switching encoders on GPU 1 reportedly produces garbled output after two or three runs, particularly Flux.2 Klein FP8. | Preserve core loading for ordinary/empty-allocation requests after DisTorch installs its patches; restore CLIP loader device selection on failures. Repeated encoder and two-stage generation tests pass with mixed-FP8 Qwen3-8B: conditioning and output pixels match exactly across runs and loader modes. See [validation](#repeated-clip-validation-2026-10-10). | - |
 | High | [#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209) | partial | MiniMax H3 mixed INT8/INT4 allocation is accepted while donor VRAM reportedly stays nearly empty. | DynamicVRAM bypass and physical-storage accounting address likely contributors; mixed-quantization checkpoints remain unvalidated. | Measure actual live donor tensor storage and load/unload behavior. Allocation logs and low donor compute utilization do not prove placement. |
 | High | [#202](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/202)/[#186](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/186); [PR #195](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/195) | fixed | aimdo initialization can omit visible GPUs or disturb existing contexts/headroom. | Initialize visible devices together before core startup; preserve primary headroom; do not reinitialize live contexts or mark missing devices initialized. Defer Torch import until core init_device; retain legacy fallback. CPU regressions pass. | - |
@@ -93,8 +93,7 @@ validated fix is available. Untested models/providers remain in those states.
 | Medium | [PR #217](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/217) | partial | Alternative ComfyUI-GGUF-Loader provider is not recognized. | Recognize the additional provider while retaining city96 support. The alternative provider is not installed locally. | Validate loading with the alternative provider. |
 | Medium | [PR #182](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/182) | fixed | Recursive schema copying can fail on metadata that cannot be deep-copied. | Copy the schema and modified optional map shallowly. Regression verifies upstream schema isolation with noncopyable metadata. | - |
 
-Next: exception-safe GGUF wrappers, async provider compatibility, then
-mixed-quantization MiniMax validation. The GPU-disappearance report still needs
+Next: mixed-quantization MiniMax validation ([#209](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/209)). The GPU-disappearance report still needs
 a reproducible graph and driver logs from the affected hardware.
 
 WanVideo/LTX feature requests are outside this crash-fix tracker;
@@ -243,8 +242,7 @@ Two code findings were addressed during the investigation:
   retain their existing fallback.
 - Standard CLIP wrappers previously called the provider before entering their
   device-restoration `try/finally`. Both standard wrapper variants now restore
-  the previous text-encoder selection if loading fails. The older GGUF wrapper
-  finding remains tracked separately; this change does not close that item.
+  the previous text-encoder selection if loading fails.
 
 The reported corruption was not reproduced on the current stack, including
 before these two additional changes. Existing runtime guards already kept the
@@ -306,3 +304,26 @@ After probe removal, a fresh 512×512, 2-step FLUX.1 DisTorch2 generation with
 4 GiB virtual VRAM and the 3060 as donor also passed. This checks that preserving
 core loading for ordinary requests does not prevent the distributed generation
 path from executing; it is not an independent measurement of donor storage.
+
+## Loader execution validation (2026-10-10)
+
+`src/loader_execution.py` adapts all 11 wrapper variants to the provider's
+execution contract. Synchronous providers return directly; async providers
+remain coroutine functions that ComfyUI can await. The existing loader scopes
+resume result processing only after the provider finishes. Between async steps,
+the adapter restores the surrounding logical devices, actual CUDA device, and
+`CoreModelPatcher` alias, so another node does not inherit suspended loader state.
+
+Regressions exercise successful results, provider/setup/output failures,
+cancellation, independent concurrent device selections, empty allocations, and
+DisTorch metadata on model and CLIP-style patcher results. Temporary nodes also
+passed through the installed ComfyUI executor for async standard, CLIP, legacy
+GGUF, and DisTorch2 wrappers. These controlled providers validate the execution
+contract; they are not the unavailable original #203 reproducer.
+
+A production-node FLUX.1-dev FP8 + DyPE generation completed in 9 seconds at
+512×512 with two sampling steps: compute on the 4080, 4 GiB donor storage on the
+3060, and CLIP/VAE on the 3060. Temporary probe nodes were removed afterward;
+production node IDs and input schemas were checked against the pre-change API.
+Prompts and histories are saved under
+`/srv/appdata/comfyui/user/default/workflow-backups/issue185/loader-*`.
