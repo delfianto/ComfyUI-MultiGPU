@@ -7,7 +7,8 @@ maintained for my own ComfyUI setup.
 ## What this does
 
 Adds device selection to ComfyUI loaders so diffusion, CLIP/text encoders, and
-VAEs can run on different GPUs. DisTorch2 can store parts of a model on another
+VAEs can run on different GPUs. The target is **latest stable ComfyUI**; older
+versions are outside scope. DisTorch2 can store parts of a model on another
 GPU or in system RAM to free VRAM on the compute GPU. Workflow steps still run
 in sequence.
 
@@ -22,8 +23,8 @@ diffusion and an **RTX 3060 12 GB** for CLIP/VAE and donor storage.
 
 Tested models include Krea2 with LoRA/DyPE, FLUX.1/2, Z-Image, Qwen Image 2.1,
 SDXL/Pony, Ideogram 4, Wan Animate, MiniMax H3 and LTX-2.5. Workflow-switching
-tests use node-result caching disabled after the default cache caused host RAM
-pressure. Hardware, model files, results and limits are in
+tests used disabled node caching to diagnose host RAM pressure; normal service
+configuration retains default caching. Hardware, model files, results and limits are in
 [the maintenance notes](docs/MAINTENANCE.md).
 
 ## Installation

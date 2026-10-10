@@ -6,6 +6,7 @@ import comfy.clip_vision
 import comfy.model_detection
 import comfy.model_management as mm
 import comfy.sd
+import comfy.storage
 import comfy.utils
 import torch
 from comfy.sd import CLIP, VAE
@@ -16,25 +17,41 @@ from .model_management_mgpu import multigpu_memory_log
 
 logger: Any = logging.getLogger("MultiGPU")
 
-checkpoint_device_config = {}
-checkpoint_distorch_config = {}
 
-original_load_state_dict_guess_config = None
+def load_checkpoint_with_placement(
+    ckpt_path, device_config, distorch_config=None, component=None, disable_dynamic=False
+):
+    """Load once and retain placement in core's per-device reload factory contract."""
+    import folder_paths
 
-
-def patch_load_state_dict_guess_config():
-    """Monkey patch comfy.sd.load_state_dict_guess_config with MultiGPU-aware checkpoint loading."""
-    global original_load_state_dict_guess_config
-
-    if original_load_state_dict_guess_config is not None:
-        logger.debug("[MultiGPU Checkpoint] load_state_dict_guess_config is already patched.")
-        return
-
-    logger.info(
-        "[MultiGPU Core Patching] Patching comfy.sd.load_state_dict_guess_config for advanced MultiGPU loading."
+    sd, metadata = comfy.utils.load_torch_file(ckpt_path, return_metadata=True)
+    out = patched_load_state_dict_guess_config(
+        sd,
+        output_model=component in (None, 0),
+        output_clip=component in (None, 1),
+        output_vae=component in (None, 2),
+        embedding_directory=folder_paths.get_folder_paths("embeddings"),
+        metadata=metadata,
+        disable_dynamic=disable_dynamic,
+        device_config=device_config,
+        distorch_config=distorch_config,
     )
-    original_load_state_dict_guess_config = comfy.sd.load_state_dict_guess_config
-    comfy.sd.load_state_dict_guess_config = patched_load_state_dict_guess_config
+    if out is None:
+        raise RuntimeError(f"Could not detect checkpoint model type: {ckpt_path}")
+    for index, value in enumerate(out[:3]):
+        if value is None:
+            continue
+        patcher = value if index == 0 else getattr(value, "patcher", None)
+        if patcher is None:
+            continue
+        patcher.cached_patcher_init = (
+            load_checkpoint_with_placement,
+            (ckpt_path, dict(device_config), dict(distorch_config or {}), index),
+        )
+    if component is not None:
+        value = out[component]
+        return value if component == 0 else value.patcher
+    return out[:3]
 
 
 def patched_load_state_dict_guess_config(
@@ -48,8 +65,11 @@ def patched_load_state_dict_guess_config(
     te_model_options=None,
     metadata=None,
     disable_dynamic=False,
+    *,
+    device_config=None,
+    distorch_config=None,
 ):
-    """Patched checkpoint loader with MultiGPU and DisTorch2 device placement support."""
+    """Checkpoint loader with MultiGPU and DisTorch2 device placement support."""
     from . import (
         get_current_device,
         get_current_text_encoder_device,
@@ -59,32 +79,17 @@ def patched_load_state_dict_guess_config(
 
     model_options = {} if model_options is None else model_options
     te_model_options = {} if te_model_options is None else te_model_options
-    assert original_load_state_dict_guess_config is not None, "Checkpoint patch not registered"
-    sd_size = sum(p.numel() for p in sd.values() if hasattr(p, "numel"))
-    config_hash = str(sd_size)
-    device_config = checkpoint_device_config.get(config_hash)
-    distorch_config = checkpoint_distorch_config.get(config_hash)
-
-    if not device_config and not distorch_config:
-        return original_load_state_dict_guess_config(
-            sd,
-            output_vae=output_vae,
-            output_clip=output_clip,
-            output_clipvision=output_clipvision,
-            embedding_directory=embedding_directory,
-            output_model=output_model,
-            model_options=model_options,
-            te_model_options=te_model_options,
-            metadata=metadata,
-            disable_dynamic=disable_dynamic,
-        )
-
     logger.debug("[MultiGPU Checkpoint] ENTERING Patched Checkpoint Loader")
     logger.debug(f"[MultiGPU Checkpoint] Received Device Config: {device_config}")
     logger.debug(f"[MultiGPU Checkpoint] Received DisTorch2 Config: {distorch_config}")
 
     device_config = device_config or {}
-    disable_dynamic = disable_dynamic or bool(distorch_config)
+    unet_disable_dynamic = disable_dynamic or bool(
+        distorch_config and distorch_config.get("unet_allocation")
+    )
+    clip_disable_dynamic = disable_dynamic or bool(
+        distorch_config and distorch_config.get("clip_allocation")
+    )
     clip = None
     clipvision = None
     vae = None
@@ -118,9 +123,9 @@ def patched_load_state_dict_guess_config(
             set_current_device(device_config.get("unet_device", original_main_device))
             diffusion_model = comfy.sd.load_diffusion_model_state_dict(
                 sd,
-                model_options=None,
+                model_options=model_options,
                 metadata=metadata,
-                disable_dynamic=disable_dynamic,
+                disable_dynamic=unet_disable_dynamic,
             )
             if diffusion_model is None:
                 return None
@@ -131,21 +136,24 @@ def patched_load_state_dict_guess_config(
         )
 
         unet_weight_dtype = list(model_config.supported_inference_dtypes)
-        if model_config.scaled_fp8 is not None:
+        if model_config.quant_config is not None:
             weight_dtype = None
 
         if custom_operations is not None:
             model_config.custom_operations = custom_operations
+        unet_compute_device = torch.device(
+            device_config.get("unet_device", model_options.get("load_device", original_main_device))
+        )
         unet_dtype = model_options.get("dtype", model_options.get("weight_dtype", None))
         if unet_dtype is None:
             unet_dtype = mm.unet_dtype(
+                device=unet_compute_device,
                 model_params=parameters,
                 supported_dtypes=unet_weight_dtype,
                 weight_dtype=weight_dtype,
             )
 
-        unet_compute_device = torch.device(device_config.get("unet_device", original_main_device))
-        if model_config.scaled_fp8 is not None:
+        if model_config.quant_config is not None:
             manual_cast_dtype = mm.unet_manual_cast(
                 None, unet_compute_device, model_config.supported_inference_dtypes
             )
@@ -153,7 +161,7 @@ def patched_load_state_dict_guess_config(
             manual_cast_dtype = mm.unet_manual_cast(
                 unet_dtype, unet_compute_device, model_config.supported_inference_dtypes
             )
-        model_config.set_inference_dtype(unet_dtype, manual_cast_dtype)
+        model_config.set_inference_dtype(unet_dtype, manual_cast_dtype, device=unet_compute_device)
         logger.info(f"UNet DType: {unet_dtype}, Manual Cast: {manual_cast_dtype}")
 
         if model_config.clip_vision_prefix is not None and output_clipvision:
@@ -162,36 +170,39 @@ def patched_load_state_dict_guess_config(
             )
 
         if output_model:
-            unet_compute_device = torch.device(
-                device_config.get("unet_device", original_main_device)
-            )
             set_current_device(unet_compute_device)
             inital_load_device = mm.unet_inital_load_device(parameters, unet_dtype)
 
-            multigpu_memory_log(f"unet:{config_hash[:8]}", "pre-load")
+            multigpu_memory_log("checkpoint_unet", "pre-load")
 
             model = model_config.get_model(sd, diffusion_model_prefix, device=inital_load_device)
             model_patcher_class = (
                 comfy.model_patcher.ModelPatcher
-                if disable_dynamic
+                if unet_disable_dynamic
                 else comfy.model_patcher.CoreModelPatcher
             )
             model_patcher = model_patcher_class(
-                model, load_device=unet_compute_device, offload_device=mm.unet_offload_device()
+                model,
+                load_device=unet_compute_device,
+                offload_device=model_options.get("offload_device", mm.unet_offload_device()),
+                fast_disk=comfy.storage.state_dict_fast_disk(sd),
             )
             model.load_model_weights(sd, diffusion_model_prefix, assign=model_patcher.is_dynamic())
-            multigpu_memory_log(f"unet:{config_hash[:8]}", "post-weights")
+            multigpu_memory_log("checkpoint_unet", "post-weights")
 
             logger.mgpu_mm_log("Invoking soft_empty_cache_multigpu before UNet ModelPatcher setup")
             soft_empty_cache_multigpu()
-            multigpu_memory_log(f"unet:{config_hash[:8]}", "post-model")
+            multigpu_memory_log("checkpoint_unet", "post-model")
 
             if distorch_config and "unet_allocation" in distorch_config:
                 unet_alloc = distorch_config["unet_allocation"]
                 if unet_alloc:
                     register_patched_safetensor_modelpatcher()
                     inner_model = model_patcher.model
-                    inner_model._distorch_v2_meta = {"full_allocation": unet_alloc}
+                    inner_model._distorch_v2_meta = {
+                        "full_allocation": unet_alloc,
+                        "eject_models": distorch_config.get("eject_models", True),
+                    }
                     logger.info(f"[CHECKPOINT_META] UNET inner_model id=0x{id(inner_model):x}")
                     model._distorch_high_precision_loras = distorch_config.get(
                         "high_precision_loras", True
@@ -200,14 +211,14 @@ def patched_load_state_dict_guess_config(
         if output_vae:
             vae_target_device = torch.device(device_config.get("vae_device", original_main_device))
             set_current_device(vae_target_device)  # Use main device context for VAE
-            multigpu_memory_log(f"vae:{config_hash[:8]}", "pre-load")
+            multigpu_memory_log("checkpoint_vae", "pre-load")
 
             vae_sd = comfy.utils.state_dict_prefix_replace(
                 sd, {k: "" for k in model_config.vae_key_prefix}, filter_keys=True
             )
             vae_sd = model_config.process_vae_state_dict(vae_sd)
-            vae = VAE(sd=vae_sd, metadata=metadata)
-            multigpu_memory_log(f"vae:{config_hash[:8]}", "post-load")
+            vae = VAE(sd=vae_sd, metadata=metadata, device=vae_target_device)
+            multigpu_memory_log("checkpoint_vae", "post-load")
 
         if output_clip:
             if te_model_options.get("custom_operations", None) is None:
@@ -243,7 +254,7 @@ def patched_load_state_dict_guess_config(
                     logger.debug(
                         "[MultiGPU Checkpoint] Invoking soft_empty_cache_multigpu before CLIP construction"
                     )
-                    multigpu_memory_log(f"clip:{config_hash[:8]}", "pre-load")
+                    multigpu_memory_log("checkpoint_clip", "pre-load")
                     soft_empty_cache_multigpu()
                     clip_params = comfy.utils.calculate_parameters(clip_sd)
                     clip = CLIP(
@@ -253,7 +264,7 @@ def patched_load_state_dict_guess_config(
                         parameters=clip_params,
                         state_dict=clip_sd,
                         model_options=te_model_options,
-                        disable_dynamic=disable_dynamic,
+                        disable_dynamic=clip_disable_dynamic,
                     )
 
                     if distorch_config and "clip_allocation" in distorch_config:
@@ -261,7 +272,10 @@ def patched_load_state_dict_guess_config(
                         if clip_alloc and hasattr(clip, "patcher"):
                             register_patched_safetensor_modelpatcher()
                             inner_clip = clip.patcher.model
-                            inner_clip._distorch_v2_meta = {"full_allocation": clip_alloc}
+                            inner_clip._distorch_v2_meta = {
+                                "full_allocation": clip_alloc,
+                                "eject_models": False,
+                            }
                             logger.info(
                                 f"[CHECKPOINT_META] CLIP inner_model id=0x{id(inner_clip):x}"
                             )
@@ -270,19 +284,18 @@ def patched_load_state_dict_guess_config(
                             )
 
                     logger.info("CLIP Loaded.")
-                    multigpu_memory_log(f"clip:{config_hash[:8]}", "post-load")
+                    multigpu_memory_log("checkpoint_clip", "post-load")
                 else:
                     logger.warning("No CLIP/text encoder weights in checkpoint.")
             else:
                 logger.warning("CLIP target not found in model config.")
 
+        if output_model and inital_load_device != torch.device("cpu"):
+            mm.load_models_gpu([model_patcher], force_full_load=True)
+
     finally:
         set_current_device(original_main_device)
         set_current_text_encoder_device(original_clip_device)
-        if config_hash in checkpoint_device_config:
-            del checkpoint_device_config[config_hash]
-        if config_hash in checkpoint_distorch_config:
-            del checkpoint_distorch_config[config_hash]
     return (model_patcher, clip, vae, clipvision)
 
 
@@ -309,26 +322,16 @@ class CheckpointLoaderAdvancedMultiGPU:
     TITLE = "Checkpoint Loader Advanced (MultiGPU)"
 
     def load_checkpoint(self, ckpt_name, unet_device, clip_device, vae_device):
-        patch_load_state_dict_guess_config()
-
-        import comfy.utils
         import folder_paths
 
         ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
-        sd = comfy.utils.load_torch_file(ckpt_path)
-        sd_size = sum(p.numel() for p in sd.values() if hasattr(p, "numel"))
-        config_hash = str(sd_size)
-
-        checkpoint_device_config[config_hash] = {
+        device_config = {
             "unet_device": unet_device,
             "clip_device": clip_device,
             "vae_device": vae_device,
         }
 
-        # Load using standard loader, our patch will intercept
-        from nodes import CheckpointLoaderSimple
-
-        return CheckpointLoaderSimple().load_checkpoint(ckpt_name)
+        return load_checkpoint_with_placement(ckpt_path, device_config)
 
 
 class CheckpointLoaderAdvancedDisTorch2MultiGPU:
@@ -385,42 +388,10 @@ class CheckpointLoaderAdvancedDisTorch2MultiGPU:
         eject_models=True,
     ):
 
-        if eject_models:
-            logger.mgpu_mm_log(
-                "[EJECT_MODELS_SETUP] eject_models=True - marking all loaded models for eviction"
-            )
-            ejection_count = 0
-            for i, lm in enumerate(mm.current_loaded_models):
-                model_name = (
-                    type(getattr(lm.model, "model", lm.model)).__name__ if lm.model else "Unknown"
-                )
-                if hasattr(lm.model, "model") and lm.model.model is not None:
-                    lm.model.model._mgpu_unload_distorch_model = True
-                    logger.mgpu_mm_log(
-                        f"[EJECT_MARKED] Model {i}: {model_name} (id=0x{id(lm):x}) → marked for eviction"
-                    )
-                    ejection_count += 1
-                elif lm.model is not None:
-                    lm.model._mgpu_unload_distorch_model = True
-                    logger.mgpu_mm_log(
-                        f"[EJECT_MARKED] Model {i}: {model_name} (direct patcher) → marked for eviction"
-                    )
-                    ejection_count += 1
-            logger.mgpu_mm_log(
-                f"[EJECT_MODELS_SETUP_COMPLETE] Marked {ejection_count} models for Comfy Core eviction during load_models_gpu"
-            )
-
-        patch_load_state_dict_guess_config()
-
-        import comfy.utils
         import folder_paths
 
         ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
-        sd = comfy.utils.load_torch_file(ckpt_path)
-        sd_size = sum(p.numel() for p in sd.values() if hasattr(p, "numel"))
-        config_hash = str(sd_size)
-
-        checkpoint_device_config[config_hash] = {
+        device_config = {
             "unet_device": unet_compute_device,
             "clip_device": clip_compute_device,
             "vae_device": vae_device,
@@ -448,10 +419,11 @@ class CheckpointLoaderAdvancedDisTorch2MultiGPU:
             else ""
         )
 
-        checkpoint_distorch_config[config_hash] = {
+        distorch_config = {
             "unet_allocation": unet_alloc,
             "clip_allocation": clip_alloc,
             "high_precision_loras": high_precision_loras,
+            "eject_models": eject_models,
             "unet_settings": hashlib.sha256(
                 f"{unet_alloc}{high_precision_loras}".encode()
             ).hexdigest(),
@@ -460,6 +432,4 @@ class CheckpointLoaderAdvancedDisTorch2MultiGPU:
             ).hexdigest(),
         }
 
-        from nodes import CheckpointLoaderSimple
-
-        return CheckpointLoaderSimple().load_checkpoint(ckpt_name)
+        return load_checkpoint_with_placement(ckpt_path, device_config, distorch_config)

@@ -46,8 +46,8 @@ A 2-step smoke test checks execution, not final image quality.
 
 ## Development checks
 
-Run from the **repository root**, using a Python environment with Torch and
-packaging (e.g. ComfyUI's environment).
+Run from the **repository root**, using a Python 3.12 environment with Torch
+(e.g. ComfyUI's environment).
 
 ```sh
 uv sync --group dev --no-install-project
@@ -64,8 +64,11 @@ unused-parameter, and deprecated-API warnings enabled. Host and optional-provide
 imports may be absent; [typings/nodes.pyi](../typings/nodes.pyi) supplies the core
 registry contract. Dynamic logger methods use an explicit `Any` boundary.
 
-As of 2026-10-10, all **53 regression tests** pass on the host and in the
-production container. Ruff, formatting, basedpyright, and GitHub CI pass.
+As of the stable API audit below, all **54 regression tests** pass in the
+production container. Ruff, formatting and basedpyright pass. CI also imports
+the fork against the latest stable core, checks loader schemas and patched
+signatures, and runs an annotated CPU model through the real loading API.
+
 
 ## Upstream triage
 
@@ -76,7 +79,7 @@ Severity is this fork's assessment; upstream does not assign severity labels.
 | Priority | Reports | Problem | Fix and validation |
 | --- | --- | --- | --- |
 | Critical | [#187](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/187), [#210](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/210), [#218](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/218), [#220](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/220); [PR #216](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/216) | CUDA peer-access probing can fail or crash. | Prefer Torch's peer API; resolve CUDA runtime libraries; probe failures return false. CPU regressions cover success, failure, caching, and platform candidates. |
-| Critical | [#211](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/211), [#213](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/213), [#222](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/222) | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep comfy-kitchen >=0.2.35 native exports. Older versions retain the compatibility patch and are unvalidated here. |
+| Critical | [#211](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/211), [#213](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/213), [#222](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/222) | Cross-device DLPack exports can conflict with kernel device/stream handling. | Keep native comfy-kitchen exports; the obsolete DLPack shim was removed in the stable API audit below. |
 | Critical | Local FP8 CLIP crash; [#189](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/189) related symptoms | CLIP/VAE inference can execute under the wrong current device. | Guard direct/scheduled CLIP and standard/tiled VAE inference with their real load device; restore state on exceptions. CPU regressions and local dual-GPU generation pass. |
 | Critical | [#184](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/184); [PR #183](https://github.com/pollockjj/ComfyUI-MultiGPU/pull/183) | DynamicVRAM stack overflow, including graphs without MultiGPU nodes. | Install the traversal guard at startup for DisTorch2 and core loaders; correct parent classification and shared-module traversal. Deep-graph CPU tests and local empty-allocation DisTorch2 generation pass. See [validation](#dynamic-loading-validation-2026-10-10). |
 | Critical | [#219](https://github.com/pollockjj/ComfyUI-MultiGPU/issues/219) | With kitchen 0.2.31, WanAnimate GPU/int8 cache reportedly kills the process without a Python traceback. | Native DLPack is preserved on kitchen 0.2.37. Local 49-frame GPU/int8 and 81-frame CPU/default generation pass; 81-frame GPU/int8 returns recoverable OOM. See [validation](#wananimate-cache-validation-2026-10-10). |
@@ -104,16 +107,11 @@ Runtime Python modules live in `src/`; `src/__init__.py` registers nodes and
 installs the compatibility patches. Tests remain in `tests/`, CI utilities in
 `ci/`, and type contracts in `typings/`.
 
-Two small entry files remain at the repository root because ComfyUI discovers
-them there:
-
-- `__init__.py` exposes the node mappings and forwards historical helper
-  attributes to `src`. Its `WEB_DIRECTORY` points to `docs/web/`, with node
-  help pages in `docs/web/docs/` to preserve ComfyUI's `docs/<node>.md` help
-  route. Documentation assets live in `docs/assets/`, and the original example
-  workflows and previews live in `docs/example_workflows/`.
-- `prestartup_script.py` executes `src/prestartup_script.py` directly. It avoids
-  importing the runtime package or Torch before core configures CUDA visibility.
+The root `__init__.py` exposes node mappings and forwards historical helper
+attributes to `src`. `WEB_DIRECTORY` points to `docs/web/`, with node help in
+`docs/web/docs/` to preserve ComfyUI's help route. Assets live in `docs/assets/`
+and original examples in `docs/example_workflows/`. The old prestartup entry
+point was removed because stable core initializes all visible GPUs itself.
 
 ## Deployment and initial validation (2026-10-10)
 
@@ -194,9 +192,8 @@ Upstream PR #183 installed the nonrecursive `_load_list` guard only inside the
 standard MultiGPU CLIP wrappers. DisTorch2 with an empty allocation string keeps
 DynamicVRAM enabled and could reach the unguarded loader when those wrappers
 had never run. The fork now installs the guard once during custom-node startup;
-per-node installation is removed. Older ComfyUI builds without
-`ModelPatcherDynamic` skip registration, and ordinary small graphs and
-non-dynamic calls still delegate to core.
+per-node installation is removed. Ordinary small graphs and non-dynamic calls
+still delegate to core.
 
 The fallback now checks descendant parameters even when a parent has no direct
 parameters, matching ComfyUI 0.39.0. This prevents a cast-enabled parent from
@@ -523,3 +520,41 @@ container, using isolated dependencies. These checkouts remain outside
 Private validation scripts, provider revisions and results are under
 `user/default/workflow-backups/provider-validation/`. The Florence2 base
 checkpoint remains in `models/LLM/Florence-2-base/` for reuse.
+
+## Latest stable API audit (2026-10-10)
+
+Target: [ComfyUI v0.39.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.39.0),
+commit `b0b7435`. Older core releases are outside scope. Deployment now resolves
+`COMFYUI_REF=latest-stable` through GitHub's release API at build and startup,
+rather than following unreleased `master` commits. Explicit tags/SHAs remain
+available; update failures retain the existing configured fallback policy.
+
+- Advanced checkpoint loading uses `quant_config`, passes the inference and
+  VAE devices, preserves explicit offload options and disk-backed weight metadata,
+  and follows core's direct-GPU loading behavior.
+- The advanced loader reads the checkpoint once and registers reload factories
+  that capture component placement and allocation. It no longer intercepts core
+  globally or identifies checkpoints by their parameter count. Reloads load only
+  the requested component and accept core's `disable_dynamic` argument.
+- DisTorch follows core's deterministic dependency order and pin-budget requests.
+  `model_patches_to` is no longer treated as a model-list API. Checkpoint ejection
+  now reaches eviction metadata, and unsplit CLIP keeps DynamicVRAM.
+- Removed the obsolete kitchen DLPack shim, four-field load-list compatibility,
+  old-provider fallback and prestartup initializer. Core initializes both GPUs;
+  current non-dynamic patchers remain necessary for explicit DisTorch allocations.
+  Serialized node names and supported V1 loader schemas are preserved.
+
+Validation: 54 CPU regressions, lint/format/type checks, Dockerfile/Compose
+validation, and the real stable-core API check pass. On the 4080/3060, SDXL
+advanced and DisTorch advanced (2 GiB donation) each completed a fresh and a
+cached 512×512, three-step generation. Both repeats reused the checkpoint and
+conditioning nodes; host available RAM stayed above 40 GiB. A separate SD1
+checkpoint reload factory returned a distinct non-dynamic patcher successfully.
+All 44 MultiGPU nodes register. Stable core exposes 1,030 total nodes versus
+1,040 on the former master checkout; the ten missing nodes are newer core nodes.
+
+These are API and execution smoke tests, not a repeat of the eleven-family
+stress test or a fix for its cache-retention findings. The small test explicitly
+purged caches between loader modes; automatic workflow-boundary cleanup remains
+pending. Prompts, histories and reports are in
+`/srv/appdata/comfyui/user/default/workflow-backups/stable-api-audit/`.

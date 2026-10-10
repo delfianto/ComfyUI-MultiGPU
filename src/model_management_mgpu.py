@@ -5,7 +5,7 @@ Extends ComfyUI's model management with multi-device capabilities and lifecycle 
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import comfy.model_management as mm
@@ -85,7 +85,7 @@ def multigpu_memory_log(identifier, tag):
                 logger.mgpu_mm_log(f"{ts_str} {tag_padded} {' '.join(parts)}")
         return
 
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(UTC)
     curr = _capture_memory_snapshot()
 
     # Store in series

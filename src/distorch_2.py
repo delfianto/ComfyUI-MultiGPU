@@ -26,12 +26,9 @@ from .model_management_mgpu import multigpu_memory_log
 
 
 def unpack_load_item(item):
-    """Handle ComfyUI 0.6.0+ 5-tuple vs legacy 4-tuple"""
-    if len(item) == 5:
-        # (module_offload_mem, module_mem, module_name, module_object, params)
-        return item[1], item[2], item[3], item[4]
-    # (module_mem, module_name, module_object, params)
-    return item[0], item[1], item[2], item[3]
+    """Extract fields from current core's non-dynamic load-list entry."""
+    _offload_size, module_size, name, module, params = item
+    return module_size, name, module, params
 
 
 def register_patched_safetensor_modelpatcher():
@@ -75,41 +72,14 @@ def register_patched_safetensor_modelpatcher():
                     inference_memory, minimum_memory_required + extra_reserved_mem
                 )
 
-            models_temp = set()
-            for m in models:
-                models_temp.add(m)
-                model_type = type(m).__name__
-
-                if (
-                    ("GGUF" in model_type or "ModelPatcher" in model_type)
-                    and hasattr(m, "model_patches_to")
-                    and not hasattr(m, "model_patches_models")
-                ):
-                    logger.info(
-                        f"[MultiGPU DisTorch V2] {type(m).__name__} missing 'model_patches_models' attribute, using 'model_patches_to' fallback."
-                    )
-                    target_device = m.load_device
-                    logger.debug(f"[MultiGPU DisTorch V2] Target device: {target_device}")
-                    patches = m.model_patches_to(target_device)
-                    if patches:
-                        logger.debug(
-                            f"[MultiGPU DisTorch V2] Found {len(patches)} mm_patch(es) for {type(m).__name__} on device {target_device}"
-                        )
-                        for mm_patch in patches:
-                            logger.debug(
-                                f"[MultiGPU DisTorch V2] Registering mm_patch: {type(mm_patch).__name__}"
-                            )
-                            models_temp.add(mm_patch)
-                    continue
-
-                for mm_patch in m.model_patches_models():
-                    models_temp.add(mm_patch)
-                patches = m.model_patches_to(m.load_device)
-                if patches:
-                    for mm_patch in patches:
-                        models_temp.add(mm_patch)
-
-            models = models_temp
+            # Match core's deterministic dependency loading order. model_patches_to
+            # moves patch payloads; it is not a source of attached model patchers.
+            models_temp = {}
+            for model in models:
+                models_temp[model] = None
+                for attached in model.model_patches_models():
+                    models_temp[attached] = None
+            models = list(reversed(models_temp))
 
             models_to_load = []
 
@@ -142,9 +112,15 @@ def register_patched_safetensor_modelpatcher():
             # Plan actual block placement before eviction, including donor devices.
             # Existing resident weights do not need a second reservation on reload.
             total_memory_required = {}
+            total_pins_required = {}
             eject_devices = set()
             for loaded_model in models_to_load:
                 model = loaded_model.model
+                if not model.is_dynamic():
+                    device = loaded_model.device
+                    total_pins_required[device] = (
+                        total_pins_required.get(device, 0) + loaded_model.model_memory()
+                    )
                 metadata = getattr(model.model, "_distorch_v2_meta", None)
                 if metadata and metadata.get("full_allocation"):
                     allocations = metadata["full_allocation"]
@@ -184,7 +160,13 @@ def register_patched_safetensor_modelpatcher():
                         if device in eject_devices
                         else device_memory * 1.1 + extra_mem
                     )
-                    free_memory(requested, device, keep_loaded=models_to_load)
+                    free_memory(
+                        requested,
+                        device,
+                        keep_loaded=models_to_load,
+                        for_dynamic=False,
+                        pins_required=total_pins_required.get(device, 0),
+                    )
 
             multigpu_memory_log("free_memory/minimum_memory_required", "post/pre")
 
@@ -225,14 +207,16 @@ def register_patched_safetensor_modelpatcher():
                     current_free_mem = get_free_memory(torch_dev) + loaded_memory
 
                     lowvram_model_memory = max(
-                        128 * 1024 * 1024,
+                        0,
                         (current_free_mem - minimum_memory_required),
                         min(
                             current_free_mem * MIN_WEIGHT_MEMORY_RATIO,
                             current_free_mem - minimum_inference_memory(),
                         ),
                     )
-                    lowvram_model_memory = max(0.1, lowvram_model_memory - loaded_memory)
+                    lowvram_model_memory -= loaded_memory
+                    if lowvram_model_memory == 0:
+                        lowvram_model_memory = 0.1
 
                 if vram_set_state == VRAMState.NO_VRAM:
                     lowvram_model_memory = 0.1
@@ -246,16 +230,10 @@ def register_patched_safetensor_modelpatcher():
         # loader asks for memory on their storage GPU.
         mm.free_memory = preserve_distributed_eviction(mm.free_memory, mm)
 
-        try:
-            from comfy import model_prefetch
-            from comfy_kitchen.tensor import base as tensor_base
-        except ImportError:
-            # Older core/kitchen versions have no allocation recorder to guard.
-            pass
-        else:
-            pause_graph = getattr(model_prefetch, "pause_malloc_graph", None)
-            if callable(pause_graph):
-                register_quantized_allocation_guard(tensor_base, pause_graph)
+        from comfy import model_prefetch
+        from comfy_kitchen.tensor import base as tensor_base
+
+        register_quantized_allocation_guard(tensor_base, model_prefetch.pause_malloc_graph)
 
         # Replace the module function
         mm.load_models_gpu = preserve_core_model_loading(
@@ -264,9 +242,7 @@ def register_patched_safetensor_modelpatcher():
 
         original_partially_load = comfy.model_patcher.ModelPatcher.partially_load
 
-        def new_partially_load(
-            self, device_to, extra_memory=0, force_patch_weights=False, **_kwargs
-        ):
+        def new_partially_load(self, device_to, extra_memory=0, force_patch_weights=False):
             """Override to use direct model annotation for allocation"""
 
             mp_id = id(self)

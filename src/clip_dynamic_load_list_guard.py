@@ -122,9 +122,7 @@ def _safe_dynamic_load_list(self, default_device=None):
 
 
 def register_clip_dynamic_load_list_guard():
-    patcher = getattr(comfy.model_patcher, "ModelPatcherDynamic", None)
-    if patcher is None:
-        return False
+    patcher = comfy.model_patcher.ModelPatcherDynamic
     original = patcher._load_list
     if getattr(original, _PATCH_MARKER, False):
         return False

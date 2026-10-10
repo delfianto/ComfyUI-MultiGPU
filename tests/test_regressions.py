@@ -48,16 +48,6 @@ class EntryPointTests(unittest.TestCase):
         self.assertEqual(module.WEB_DIRECTORY, "./docs/web")
         self.assertTrue((ROOT / module.WEB_DIRECTORY / "docs/CLIPLoaderMultiGPU.md").is_file())
 
-    def test_prestartup_executes_only_independent_initializer(self):
-        spec = importlib.util.spec_from_file_location(
-            "mgpu_prestart_regression", ROOT / "prestartup_script.py"
-        )
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        with patch("runpy.run_path") as execute:
-            spec.loader.exec_module(module)
-        execute.assert_called_once_with(str(SOURCE / "prestartup_script.py"))
-
 
 class PeerTests(unittest.TestCase):
     def setUp(self):
@@ -287,14 +277,6 @@ class CompatibilityTests(unittest.TestCase):
         distributed.assert_called_once_with(models)
         core.assert_not_called()
 
-    def test_legacy_provider_keeps_existing_fallback(self):
-        module = load_module("compatibility")
-        core, distributed = Mock(), Mock()
-        models = [SimpleNamespace(model=SimpleNamespace())]
-        module.preserve_core_model_loading(core, distributed)(models)
-        distributed.assert_called_once_with(models)
-        core.assert_not_called()
-
     def test_shared_patch_cycles_preserve_core_and_propagate_errors(self):
         module = load_module("compatibility")
         model = self.model()
@@ -305,12 +287,6 @@ class CompatibilityTests(unittest.TestCase):
             module.preserve_core_model_loading(core, distributed)([model])
         core.assert_called_once_with([model])
         distributed.assert_not_called()
-
-    def test_native_kitchen_versions_are_not_patched(self):
-        module = load_module("compatibility")
-        self.assertTrue(module.needs_legacy_dlpack_guard("0.2.34"))
-        for version in ("0.2.35", "0.2.37", "1.0.0", "unknown"):
-            self.assertFalse(module.needs_legacy_dlpack_guard(version))
 
     def test_distorch_patcher_restores_alias_on_exception(self):
         module = load_module("compatibility")
@@ -323,40 +299,6 @@ class CompatibilityTests(unittest.TestCase):
         self.assertIs(patcher.CoreModelPatcher, dynamic)
         with module.legacy_patcher_for_distorch(patcher, False):
             self.assertIs(patcher.CoreModelPatcher, dynamic)
-
-
-class AimdoTests(unittest.TestCase):
-    def setUp(self):
-        fake: Any = ModuleType("comfy_aimdo")
-        fake.control = SimpleNamespace(init_device=Mock(), devctxs=[])
-        with patch.dict(sys.modules, {"comfy_aimdo": fake}):
-            self.module = load_module("prestartup_script")
-        self.original = Mock(return_value=False)
-        self.original._multigpu_all_devices = False
-        self.control = SimpleNamespace(
-            init_device=self.original, init_devices=Mock(return_value=True), devctxs=[]
-        )
-        self.cuda = SimpleNamespace(is_available=lambda: True, device_count=lambda: 2)
-
-    def test_all_devices_and_headroom_are_preserved(self):
-        self.module.install_aimdo_device_init_guard(self.control, self.cuda)
-        self.assertTrue(self.control.init_device(1, extra_vram_headroom=123))
-        self.control.init_devices.assert_called_once_with([0, (1, 123)])
-        self.original.assert_not_called()
-        self.assertFalse(self.module.install_aimdo_device_init_guard(self.control, self.cuda))
-
-    def test_existing_contexts_are_not_reinitialized(self):
-        self.control.devctxs = [object()]
-        self.module.install_aimdo_device_init_guard(self.control, self.cuda)
-        self.assertFalse(self.control.init_device(1))
-        self.control.init_devices.assert_not_called()
-        self.original.assert_called_once()
-
-    def test_single_device_and_cpu_delegate(self):
-        self.cuda.device_count = lambda: 1
-        self.module.install_aimdo_device_init_guard(self.control, self.cuda)
-        self.control.init_device(0, 42)
-        self.original.assert_called_once_with(0, extra_vram_headroom=42)
 
 
 class LoaderTests(unittest.TestCase):

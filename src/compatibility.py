@@ -1,19 +1,7 @@
 """Small compatibility decisions kept separate from ComfyUI startup patches."""
 
-from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, cast
-
-from packaging.version import InvalidVersion, Version
-
-
-def needs_legacy_dlpack_guard(version: str) -> bool:
-    try:
-        return Version(version) < Version("0.2.35")
-    except InvalidVersion:
-        # An unknown/new backend should keep its own export implementation.
-        return False
 
 
 @contextmanager
@@ -28,7 +16,7 @@ def legacy_patcher_for_distorch(model_patcher, enabled: bool):
 
 
 def preserve_core_model_loading(core_loader, distributed_loader):
-    """Use DisTorch's loader only for annotated models or legacy provider contracts.
+    """Use DisTorch's loader only for annotated models.
 
     Empty-allocation CLIP nodes must keep core's DynamicVRAM eviction, pinning,
     and loading order, even after a DisTorch node has installed its patches.
@@ -47,11 +35,7 @@ def preserve_core_model_loading(core_loader, distributed_loader):
             metadata = getattr(getattr(model, "model", None), "_distorch_v2_meta", None)
             if metadata and metadata.get("full_allocation"):
                 return distributed_loader(models, *args, **kwargs)
-            patches = getattr(model, "model_patches_models", None)
-            if not callable(patches):
-                # Old GGUF providers need the fallback in the distributed loader.
-                return distributed_loader(models, *args, **kwargs)
-            pending.extend(cast(Callable[[], Iterable[Any]], patches)())
+            pending.extend(model.model_patches_models())
         return core_loader(models, *args, **kwargs)
 
     return load_models_gpu

@@ -123,7 +123,3 @@ class DynamicLoadingTests(unittest.TestCase):
         legacy = SimpleNamespace(model=deep)
         self.assertEqual(installed(legacy, for_dynamic=False), "native")
         self.assertEqual(self.native.call_count, 2)
-
-    def test_older_comfy_without_dynamic_patcher_is_supported(self):
-        del self.guard.comfy.model_patcher.ModelPatcherDynamic
-        self.assertFalse(self.guard.register_clip_dynamic_load_list_guard())
