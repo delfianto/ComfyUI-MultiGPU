@@ -253,9 +253,10 @@ in use before the tests. Other services were not stopped to free that memory.
 
 The first DisTorch2 run assigned 3094.15 MiB of layers to cuda:0, 8168.53 MiB
 to cuda:1, and 4614.47 MiB to CPU, plus 3.38 MiB of small layers on cuda:0.
-This verifies quantized donor placement, not successful completion of that
-configuration. Shifting weights did not leave enough memory for the larger
-GPU cache and activation working set on this setup.
+The loader reported completing this assignment, but sampling failed. These
+logs do not independently measure live donor storage or validate the complete
+configuration. The larger GPU cache and activation working set still exhausted
+VRAM on this setup.
 
 Successful outputs have the expected frame counts and dimensions. Selected
 frames were checked for nonblank content, and the 49-frame CPU/GPU contact

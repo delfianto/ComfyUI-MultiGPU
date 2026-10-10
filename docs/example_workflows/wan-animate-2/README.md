@@ -40,7 +40,7 @@ WebP under `output/wananimate-issue219/`.
 
 Run the cases sequentially. Our larger GPU/int8 case with the ordinary loader
 exhausted the 4080's VRAM. Explicit DisTorch2 splits also exhausted VRAM during
-activation allocation, despite successfully placing about 8 GiB of weights on
+activation allocation, despite reporting about 8 GiB of weights assigned to
 the 3060. Neither failing configuration is included as a recommended example.
 Use CPU/default cache for 81 frames on this setup. These are tested personal
 configurations, not general memory guarantees or performance benchmarks.
